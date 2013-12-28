@@ -166,7 +166,7 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(const QList<SendCoinsRecipie
             std::map<CBitcoinAddress, std::string>::iterator mi = wallet->mapAddressBook.find(strAddress);
 
             // Check if we have a new address or an updated label
-            if (mi == wallet->mapAddressBook.end() || mi->second != strLabel)
+            if(mi == wallet->mapAddressBook.end() || mi->second != strLabel)
             {
                 wallet->SetAddressBookName(strAddress, strLabel);
             }

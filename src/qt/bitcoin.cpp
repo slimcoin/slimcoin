@@ -139,9 +139,9 @@ int main(int argc, char *argv[])
 // TODO: implement qtipcserver.cpp for Mac and Windows
 
     // Do this early as we don't want to bother initializing if we are just calling IPC
-    for (int i = 1; i < argc; i++)
+    for(int i = 1; i < argc; i++)
     {
-        if (strlen(argv[i]) >= 7 && strncasecmp(argv[i], "slimcoin:", 7) == 0)
+        if(strlen(argv[i]) >= 7 && strncasecmp(argv[i], "slimcoin:", 7) == 0)
         {
             const char *strURI = argv[i];
             try {
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
     ParseParameters(argc, argv);
 
     // ... then bitcoin.conf:
-    if (!boost::filesystem::is_directory(GetDataDir(false)))
+    if(!boost::filesystem::is_directory(GetDataDir(false)))
     {
         fprintf(stderr, "Error: Specified directory does not exist\n");
         return 1;
@@ -199,23 +199,23 @@ int main(int argc, char *argv[])
     QTranslator qtTranslatorBase, qtTranslator, translatorBase, translator;
 
     qtTranslatorBase.load(QLibraryInfo::location(QLibraryInfo::TranslationsPath) + "/qt_" + lang);
-    if (!qtTranslatorBase.isEmpty())
+    if(!qtTranslatorBase.isEmpty())
         app.installTranslator(&qtTranslatorBase);
 
     qtTranslator.load(QLibraryInfo::location(QLibraryInfo::TranslationsPath) + "/qt_" + lang_territory);
-    if (!qtTranslator.isEmpty())
+    if(!qtTranslator.isEmpty())
         app.installTranslator(&qtTranslator);
 
     translatorBase.load(":/translations/"+lang);
-    if (!translatorBase.isEmpty())
+    if(!translatorBase.isEmpty())
         app.installTranslator(&translatorBase);
 
     translator.load(":/translations/"+lang_territory);
-    if (!translator.isEmpty())
+    if(!translator.isEmpty())
         app.installTranslator(&translator);
 
     QSplashScreen splash(QPixmap(":/images/splash"), 0);
-    if (GetBoolArg("-splash", true) && !GetBoolArg("-min"))
+    if(GetBoolArg("-splash", true) && !GetBoolArg("-min"))
     {
         splash.show();
         splash.setAutoFillBackground(true);
@@ -238,7 +238,7 @@ int main(int argc, char *argv[])
 
                 optionsModel.Upgrade(); // Must be done after AppInit2
 
-                if (splashref)
+                if(splashref)
                     splash.finish(&window);
 
                 ClientModel clientModel(&optionsModel);
@@ -266,9 +266,9 @@ int main(int argc, char *argv[])
 // TODO: implement qtipcserver.cpp for Mac and Windows
 
                 // Check for URI in argv
-                for (int i = 1; i < argc; i++)
+                for(int i = 1; i < argc; i++)
                 {
-                    if (strlen(argv[i]) >= 7 && strncasecmp(argv[i], "slimcoin:", 7) == 0)
+                    if(strlen(argv[i]) >= 7 && strncasecmp(argv[i], "slimcoin:", 7) == 0)
                     {
                         const char *strURI = argv[i];
                         try {

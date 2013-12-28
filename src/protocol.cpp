@@ -61,7 +61,7 @@ CMessageHeader::CMessageHeader(const char* pszCommand, unsigned int nMessageSize
 
 std::string CMessageHeader::GetCommand() const
 {
-  if (pchCommand[COMMAND_SIZE-1] == 0)
+  if(pchCommand[COMMAND_SIZE-1] == 0)
     return std::string(pchCommand, pchCommand + strlen(pchCommand));
   else
     return std::string(pchCommand, pchCommand + COMMAND_SIZE);
@@ -72,25 +72,25 @@ bool CMessageHeader::IsValid() const
   // Check start string
   unsigned char pchMessageStartProtocol[4];
   GetMessageStart(pchMessageStartProtocol);
-  if (memcmp(pchMessageStart, pchMessageStartProtocol, sizeof(pchMessageStart)) != 0)
+  if(memcmp(pchMessageStart, pchMessageStartProtocol, sizeof(pchMessageStart)) != 0)
     return false;
 
   // Check the command string for errors
-  for (const char* p1 = pchCommand; p1 < pchCommand + COMMAND_SIZE; p1++)
+  for(const char* p1 = pchCommand; p1 < pchCommand + COMMAND_SIZE; p1++)
   {
-    if (*p1 == 0)
+    if(*p1 == 0)
     {
       // Must be all zeros after the first zero
-      for (; p1 < pchCommand + COMMAND_SIZE; p1++)
-        if (*p1 != 0)
+      for(; p1 < pchCommand + COMMAND_SIZE; p1++)
+        if(*p1 != 0)
           return false;
     }
-    else if (*p1 < ' ' || *p1 > 0x7E)
+    else if(*p1 < ' ' || *p1 > 0x7E)
       return false;
   }
 
   // Message size
-  if (nMessageSize > MAX_SIZE)
+  if(nMessageSize > MAX_SIZE)
   {
     printf("CMessageHeader::IsValid() : (%s, %u bytes) nMessageSize > MAX_SIZE\n", GetCommand().c_str(), nMessageSize);
     return false;
@@ -134,15 +134,15 @@ CInv::CInv(int typeIn, const uint256& hashIn)
 CInv::CInv(const std::string& strType, const uint256& hashIn)
 {
   unsigned int i;
-  for (i = 1; i < ARRAYLEN(ppszTypeName); i++)
+  for(i = 1; i < ARRAYLEN(ppszTypeName); i++)
   {
-    if (strType == ppszTypeName[i])
+    if(strType == ppszTypeName[i])
     {
       type = i;
       break;
     }
   }
-  if (i == ARRAYLEN(ppszTypeName))
+  if(i == ARRAYLEN(ppszTypeName))
     throw std::out_of_range(strprintf("CInv::CInv(string, uint256) : unknown type '%s'", strType.c_str()));
   hash = hashIn;
 }
@@ -159,7 +159,7 @@ bool CInv::IsKnownType() const
 
 const char* CInv::GetCommand() const
 {
-  if (!IsKnownType())
+  if(!IsKnownType())
     throw std::out_of_range(strprintf("CInv::GetCommand() : type=%d unknown type", type));
   return ppszTypeName[type];
 }

@@ -232,7 +232,7 @@ void TransactionTableModel::update()
     // Check if there are changes to wallet map
     {
         TRY_LOCK(wallet->cs_wallet, lockWallet);
-        if (lockWallet && !wallet->vWalletUpdated.empty())
+        if(lockWallet && !wallet->vWalletUpdated.empty())
         {
             BOOST_FOREACH(uint256 hash, wallet->vWalletUpdated)
             {
@@ -584,10 +584,10 @@ QVariant TransactionTableModel::headerData(int section, Qt::Orientation orientat
         {
             return columns[section];
         }
-        else if (role == Qt::TextAlignmentRole)
+        else if(role == Qt::TextAlignmentRole)
         {
             return column_alignments[section];
-        } else if (role == Qt::ToolTipRole)
+        } else if(role == Qt::ToolTipRole)
         {
             switch(section)
             {

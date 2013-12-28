@@ -23,7 +23,7 @@ BOOST_AUTO_TEST_CASE(util_criticalsection)
 
     do {
         TRY_LOCK(cs, lockTest);
-        if (lockTest)
+        if(lockTest)
             break;
 
         BOOST_ERROR("break was swallowed!");

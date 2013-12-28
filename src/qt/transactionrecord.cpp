@@ -6,7 +6,7 @@
  */
 bool TransactionRecord::showTransaction(const CWalletTx &wtx)
 {
-    if (wtx.IsCoinBase())
+    if(wtx.IsCoinBase())
     {
         // Don't show generated coin until confirmed by at least one block after it
         // so we don't get the user's hopes up until it looks like it's probably accepted.
@@ -19,7 +19,7 @@ bool TransactionRecord::showTransaction(const CWalletTx &wtx)
         // because they can always get into some block eventually.  Generated coins
         // are special because if their block is not accepted, they are not valid.
         //
-        if (wtx.GetDepthInMainChain() < 2)
+        if(wtx.GetDepthInMainChain() < 2)
         {
             return false;
         }
@@ -40,13 +40,13 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
     uint256 hash = wtx.GetHash();
     std::map<std::string, std::string> mapValue = wtx.mapValue;
 
-    if (showTransaction(wtx))
+    if(showTransaction(wtx))
     {
-        if (wtx.IsCoinStake()) // slimcoin: coinstake transaction
+        if(wtx.IsCoinStake()) // slimcoin: coinstake transaction
         {
             parts.append(TransactionRecord(hash, nTime, TransactionRecord::StakeMint, "", -nDebit, wtx.GetValueOut()));
         }
-        else if (nNet > 0 || wtx.IsCoinBase())
+        else if(nNet > 0 || wtx.IsCoinBase())
         {
             //
             // Credit
@@ -59,12 +59,12 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     CBitcoinAddress address;
                     sub.idx = parts.size(); // sequence number
                     sub.credit = txout.nValue;
-                    if (wtx.IsCoinBase())
+                    if(wtx.IsCoinBase())
                     {
                         // Generated
                         sub.type = TransactionRecord::Generated;
                     }
-                    else if (ExtractAddress(txout.scriptPubKey, address) && wallet->HaveKey(address))
+                    else if(ExtractAddress(txout.scriptPubKey, address) && wallet->HaveKey(address))
                     {
                         // Received by Bitcoin Address
                         sub.type = TransactionRecord::RecvWithAddress;
@@ -91,7 +91,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             BOOST_FOREACH(const CTxOut& txout, wtx.vout)
                 fAllToMe = fAllToMe && wallet->IsMine(txout);
 
-            if (fAllFromMe && fAllToMe)
+            if(fAllFromMe && fAllToMe)
             {
                 // Payment to self
                 int64 nChange = wtx.GetChange();
@@ -99,14 +99,14 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                 parts.append(TransactionRecord(hash, nTime, TransactionRecord::SendToSelf, "",
                                 -(nDebit - nChange), nCredit - nChange));
             }
-            else if (fAllFromMe)
+            else if(fAllFromMe)
             {
                 //
                 // Debit
                 //
                 int64 nTxFee = nDebit - wtx.GetValueOut();
 
-                for (int nOut = 0; nOut < wtx.vout.size(); nOut++)
+                for(int nOut = 0; nOut < wtx.vout.size(); nOut++)
                 {
                     const CTxOut& txout = wtx.vout[nOut];
                     TransactionRecord sub(hash, nTime);
@@ -120,7 +120,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
                     }
 
                     CBitcoinAddress address;
-                    if (ExtractAddress(txout.scriptPubKey, address))
+                    if(ExtractAddress(txout.scriptPubKey, address))
                     {
                         // Sent to Bitcoin Address
                         sub.type = TransactionRecord::SendToAddress;
@@ -135,7 +135,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
                     int64 nValue = txout.nValue;
                     /* Add fee to first output */
-                    if (nTxFee > 0)
+                    if(nTxFee > 0)
                     {
                         nValue += nTxFee;
                         nTxFee = 0;
@@ -165,7 +165,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     // Find the block the tx is in
     CBlockIndex* pindex = NULL;
     std::map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(wtx.hashBlock);
-    if (mi != mapBlockIndex.end())
+    if(mi != mapBlockIndex.end())
         pindex = (*mi).second;
 
     // Sort order, unrecorded transactions sort to the top
@@ -178,9 +178,9 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     status.depth = wtx.GetDepthInMainChain();
     status.cur_num_blocks = nBestHeight;
 
-    if (!wtx.IsFinal())
+    if(!wtx.IsFinal())
     {
-        if (wtx.nLockTime < LOCKTIME_THRESHOLD)
+        if(wtx.nLockTime < LOCKTIME_THRESHOLD)
         {
             status.status = TransactionStatus::OpenUntilBlock;
             status.open_for = nBestHeight - wtx.nLockTime;
@@ -193,11 +193,11 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     }
     else
     {
-        if (GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
+        if(GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
         {
             status.status = TransactionStatus::Offline;
         }
-        else if (status.depth < NumConfirmations)
+        else if(status.depth < NumConfirmations)
         {
             status.status = TransactionStatus::Unconfirmed;
         }
@@ -211,16 +211,16 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
     if(type == TransactionRecord::Generated || type == TransactionRecord::StakeMint)
     {
         int64 nCredit = wtx.GetCredit(true);
-        if (nCredit == 0)
+        if(nCredit == 0)
         {
             status.maturity = TransactionStatus::Immature;
 
-            if (wtx.IsInMainChain())
+            if(wtx.IsInMainChain())
             {
                 status.matures_in = wtx.GetBlocksToMaturity();
 
                 // Check if the block was requested by anyone
-                if (GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
+                if(GetAdjustedTime() - wtx.nTimeReceived > 2 * 60 && wtx.GetRequestCount() == 0)
                     status.maturity = TransactionStatus::MaturesWarning;
             }
             else

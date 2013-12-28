@@ -421,17 +421,17 @@ void BitcoinGUI::trayIconActivated(QSystemTrayIcon::ActivationReason reason)
 void BitcoinGUI::toggleHidden()
 {
     // activateWindow() (sometimes) helps with keyboard focus on Windows
-    if (isHidden())
+    if(isHidden())
     {
         show();
         activateWindow();
     }
-    else if (isMinimized())
+    else if(isMinimized())
     {
         showNormal();
         activateWindow();
     }
-    else if (GUIUtil::isObscured(this))
+    else if(GUIUtil::isObscured(this))
     {
         raise();
         activateWindow();
@@ -474,7 +474,7 @@ void BitcoinGUI::setNumConnections(int count)
 void BitcoinGUI::setNumBlocks(int count)
 {
     // don't show / hide progressBar and it's label if we have no connection(s) to the network
-    if (!clientModel || clientModel->getNumConnections() == 0)
+    if(!clientModel || clientModel->getNumConnections() == 0)
     {
         progressBarLabel->setVisible(false);
         progressBar->setVisible(false);
@@ -490,7 +490,7 @@ void BitcoinGUI::setNumBlocks(int count)
         int nRemainingBlocks = nTotalBlocks - count;
         float nPercentageDone = count / (nTotalBlocks * 0.01f);
 
-        if (clientModel->getStatusBarWarnings() == "")
+        if(clientModel->getStatusBarWarnings() == "")
         {
             progressBarLabel->setText(tr("Synchronizing with network..."));
             progressBarLabel->setVisible(true);
@@ -509,7 +509,7 @@ void BitcoinGUI::setNumBlocks(int count)
     }
     else
     {
-        if (clientModel->getStatusBarWarnings() == "")
+        if(clientModel->getStatusBarWarnings() == "")
             progressBarLabel->setVisible(false);
         else
         {

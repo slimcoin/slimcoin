@@ -84,7 +84,7 @@ BOOST_AUTO_TEST_CASE(DoS_bantime)
 
 static bool CheckNBits(unsigned int nbits1, int64 time1, unsigned int nbits2, int64 time2)\
 {
-    if (time1 > time2)
+    if(time1 > time2)
         return CheckNBits(nbits2, time2, nbits1, time1);
     int64 deltaTime = time2-time1;
 
@@ -136,7 +136,7 @@ CTransaction RandomOrphan()
 {
     std::map<uint256, CDataStream*>::iterator it;
     it = mapOrphanTransactions.lower_bound(GetRandHash());
-    if (it == mapOrphanTransactions.end())
+    if(it == mapOrphanTransactions.end())
         it = mapOrphanTransactions.begin();
     const CDataStream* pvMsg = it->second;
     CTransaction tx;
@@ -152,7 +152,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
     keystore.AddKey(key);
 
     // 50 orphan transactions:
-    for (int i = 0; i < 50; i++)
+    for(int i = 0; i < 50; i++)
     {
         CTransaction tx;
         tx.vin.resize(1);
@@ -169,7 +169,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
     }
 
     // ... and 50 that depend on other orphans:
-    for (int i = 0; i < 50; i++)
+    for(int i = 0; i < 50; i++)
     {
         CTransaction txPrev = RandomOrphan();
 
@@ -188,7 +188,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
     }
 
     // This really-big orphan should be ignored:
-    for (int i = 0; i < 10; i++)
+    for(int i = 0; i < 10; i++)
     {
         CTransaction txPrev = RandomOrphan();
 
@@ -197,7 +197,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout[0].nValue = 1*CENT;
         tx.vout[0].scriptPubKey.SetBitcoinAddress(key.GetPubKey());
         tx.vin.resize(500);
-        for (int j = 0; j < tx.vin.size(); j++)
+        for(int j = 0; j < tx.vin.size(); j++)
         {
             tx.vin[j].prevout.n = j;
             tx.vin[j].prevout.hash = txPrev.GetHash();
@@ -205,7 +205,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         SignSignature(keystore, txPrev, tx, 0);
         // Re-use same signature for other inputs
         // (they don't have to be valid for this test)
-        for (int j = 1; j < tx.vin.size(); j++)
+        for(int j = 1; j < tx.vin.size(); j++)
             tx.vin[j].scriptSig = tx.vin[0].scriptSig;
 
         CDataStream ds(SER_DISK, CLIENT_VERSION);
@@ -235,7 +235,7 @@ BOOST_AUTO_TEST_CASE(DoS_checkSig)
     // 100 orphan transactions:
     static const int NPREV=100;
     CTransaction orphans[NPREV];
-    for (int i = 0; i < NPREV; i++)
+    for(int i = 0; i < NPREV; i++)
     {
         CTransaction& tx = orphans[i];
         tx.vin.resize(1);
@@ -257,32 +257,32 @@ BOOST_AUTO_TEST_CASE(DoS_checkSig)
     tx.vout[0].nValue = 1*CENT;
     tx.vout[0].scriptPubKey.SetBitcoinAddress(key.GetPubKey());
     tx.vin.resize(NPREV);
-    for (int j = 0; j < tx.vin.size(); j++)
+    for(int j = 0; j < tx.vin.size(); j++)
     {
         tx.vin[j].prevout.n = 0;
         tx.vin[j].prevout.hash = orphans[j].GetHash();
     }
     // Creating signatures primes the cache:
     boost::posix_time::ptime mst1 = boost::posix_time::microsec_clock::local_time();
-    for (int j = 0; j < tx.vin.size(); j++)
+    for(int j = 0; j < tx.vin.size(); j++)
         BOOST_CHECK(SignSignature(keystore, orphans[j], tx, j));
     boost::posix_time::ptime mst2 = boost::posix_time::microsec_clock::local_time();
     boost::posix_time::time_duration msdiff = mst2 - mst1;
     long nOneValidate = msdiff.total_milliseconds();
-    if (fDebug) printf("DoS_Checksig sign: %ld\n", nOneValidate);
+    if(fDebug) printf("DoS_Checksig sign: %ld\n", nOneValidate);
 
     // ... now validating repeatedly should be quick:
     // 2.8GHz machine, -g build: Sign takes ~760ms,
     // uncached Verify takes ~250ms, cached Verify takes ~50ms
     // (for 100 single-signature inputs)
     mst1 = boost::posix_time::microsec_clock::local_time();
-    for (int i = 0; i < 5; i++)
-        for (int j = 0; j < tx.vin.size(); j++)
+    for(int i = 0; i < 5; i++)
+        for(int j = 0; j < tx.vin.size(); j++)
             BOOST_CHECK(VerifySignature(orphans[j], tx, j, true, SIGHASH_ALL));
     mst2 = boost::posix_time::microsec_clock::local_time();
     msdiff = mst2 - mst1;
     long nManyValidate = msdiff.total_milliseconds();
-    if (fDebug) printf("DoS_Checksig five: %ld\n", nManyValidate);
+    if(fDebug) printf("DoS_Checksig five: %ld\n", nManyValidate);
 
     BOOST_CHECK_MESSAGE(nManyValidate < nOneValidate, "Signature cache timing failed");
 
@@ -304,7 +304,7 @@ BOOST_AUTO_TEST_CASE(DoS_checkSig)
     CScript oldSig = tx.vin[0].scriptSig;
     BOOST_CHECK(SignSignature(keystore, orphans[0], tx, 0));
     BOOST_CHECK(tx.vin[0].scriptSig != oldSig);
-    for (int j = 0; j < tx.vin.size(); j++)
+    for(int j = 0; j < tx.vin.size(); j++)
         BOOST_CHECK(VerifySignature(orphans[j], tx, j, true, SIGHASH_ALL));
     mapArgs.erase("-maxsigcachesize");
 

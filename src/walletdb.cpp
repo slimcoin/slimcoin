@@ -69,21 +69,21 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
     bool fAllAccounts = (strAccount == "*");
 
     Dbc* pcursor = GetCursor();
-    if (!pcursor)
+    if(!pcursor)
         throw runtime_error("CWalletDB::ListAccountCreditDebit() : cannot create DB cursor");
     unsigned int fFlags = DB_SET_RANGE;
     loop
     {
         // Read next record
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
-        if (fFlags == DB_SET_RANGE)
+        if(fFlags == DB_SET_RANGE)
             ssKey << boost::make_tuple(string("acentry"), (fAllAccounts? string("") : strAccount), uint64(0));
         CDataStream ssValue(SER_DISK, CLIENT_VERSION);
         int ret = ReadAtCursor(pcursor, ssKey, ssValue, fFlags);
         fFlags = DB_NEXT;
-        if (ret == DB_NOTFOUND)
+        if(ret == DB_NOTFOUND)
             break;
-        else if (ret != 0)
+        else if(ret != 0)
         {
             pcursor->close();
             throw runtime_error("CWalletDB::ListAccountCreditDebit() : error scanning DB");
@@ -92,11 +92,11 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
         // Unserialize
         string strType;
         ssKey >> strType;
-        if (strType != "acentry")
+        if(strType != "acentry")
             break;
         CAccountingEntry acentry;
         ssKey >> acentry.strAccount;
-        if (!fAllAccounts && acentry.strAccount != strAccount)
+        if(!fAllAccounts && acentry.strAccount != strAccount)
             break;
 
         ssValue >> acentry;
@@ -118,16 +118,16 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
     {
         LOCK(pwallet->cs_wallet);
         int nMinVersion = 0;
-        if (Read((string)"minversion", nMinVersion))
+        if(Read((string)"minversion", nMinVersion))
         {
-            if (nMinVersion > CLIENT_VERSION)
+            if(nMinVersion > CLIENT_VERSION)
                 return DB_TOO_NEW;
             pwallet->LoadMinVersion(nMinVersion);
         }
 
         // Get cursor
         Dbc* pcursor = GetCursor();
-        if (!pcursor)
+        if(!pcursor)
         {
             printf("Error getting wallet database cursor\n");
             return DB_CORRUPT;
@@ -139,9 +139,9 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
             CDataStream ssKey(SER_DISK, CLIENT_VERSION);
             CDataStream ssValue(SER_DISK, CLIENT_VERSION);
             int ret = ReadAtCursor(pcursor, ssKey, ssValue);
-            if (ret == DB_NOTFOUND)
+            if(ret == DB_NOTFOUND)
                 break;
-            else if (ret != 0)
+            else if(ret != 0)
             {
                 printf("Error reading next record from wallet database\n");
                 return DB_CORRUPT;
@@ -152,13 +152,13 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
             // is just the two items serialized one after the other
             string strType;
             ssKey >> strType;
-            if (strType == "name")
+            if(strType == "name")
             {
                 string strAddress;
                 ssKey >> strAddress;
                 ssValue >> pwallet->mapAddressBook[strAddress];
             }
-            else if (strType == "tx")
+            else if(strType == "tx")
             {
                 uint256 hash;
                 ssKey >> hash;
@@ -166,13 +166,13 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
                 ssValue >> wtx;
                 wtx.BindWallet(pwallet);
 
-                if (wtx.GetHash() != hash)
+                if(wtx.GetHash() != hash)
                     printf("Error in wallet.dat, hash mismatch\n");
 
                 // Undo serialize changes in 31600
-                if (31404 <= wtx.fTimeReceivedIsTxTime && wtx.fTimeReceivedIsTxTime <= 31703)
+                if(31404 <= wtx.fTimeReceivedIsTxTime && wtx.fTimeReceivedIsTxTime <= 31703)
                 {
-                    if (!ssValue.empty())
+                    if(!ssValue.empty())
                     {
                         char fTmp;
                         char fUnused;
@@ -196,32 +196,32 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
                 //    wtx.hashBlock.ToString().substr(0,20).c_str(),
                 //    wtx.mapValue["message"].c_str());
             }
-            else if (strType == "acentry")
+            else if(strType == "acentry")
             {
                 string strAccount;
                 ssKey >> strAccount;
                 uint64 nNumber;
                 ssKey >> nNumber;
-                if (nNumber > nAccountingEntryNumber)
+                if(nNumber > nAccountingEntryNumber)
                     nAccountingEntryNumber = nNumber;
             }
-            else if (strType == "key" || strType == "wkey")
+            else if(strType == "key" || strType == "wkey")
             {
                 vector<unsigned char> vchPubKey;
                 ssKey >> vchPubKey;
                 CKey key;
-                if (strType == "key")
+                if(strType == "key")
                 {
                     CPrivKey pkey;
                     ssValue >> pkey;
                     key.SetPubKey(vchPubKey);
                     key.SetPrivKey(pkey);
-                    if (key.GetPubKey() != vchPubKey)
+                    if(key.GetPubKey() != vchPubKey)
                     {
                         printf("Error reading wallet database: CPrivKey pubkey inconsistency\n");
                         return DB_CORRUPT;
                     }
-                    if (!key.IsValid())
+                    if(!key.IsValid())
                     {
                         printf("Error reading wallet database: invalid CPrivKey\n");
                         return DB_CORRUPT;
@@ -233,24 +233,24 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
                     ssValue >> wkey;
                     key.SetPubKey(vchPubKey);
                     key.SetPrivKey(wkey.vchPrivKey);
-                    if (key.GetPubKey() != vchPubKey)
+                    if(key.GetPubKey() != vchPubKey)
                     {
                         printf("Error reading wallet database: CWalletKey pubkey inconsistency\n");
                         return DB_CORRUPT;
                     }
-                    if (!key.IsValid())
+                    if(!key.IsValid())
                     {
                         printf("Error reading wallet database: invalid CWalletKey\n");
                         return DB_CORRUPT;
                     }
                 }
-                if (!pwallet->LoadKey(key))
+                if(!pwallet->LoadKey(key))
                 {
                     printf("Error reading wallet database: LoadKey failed\n");
                     return DB_CORRUPT;
                 }
             }
-            else if (strType == "mkey")
+            else if(strType == "mkey")
             {
                 unsigned int nID;
                 ssKey >> nID;
@@ -262,45 +262,45 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
                     return DB_CORRUPT;
                 }
                 pwallet->mapMasterKeys[nID] = kMasterKey;
-                if (pwallet->nMasterKeyMaxID < nID)
+                if(pwallet->nMasterKeyMaxID < nID)
                     pwallet->nMasterKeyMaxID = nID;
             }
-            else if (strType == "ckey")
+            else if(strType == "ckey")
             {
                 vector<unsigned char> vchPubKey;
                 ssKey >> vchPubKey;
                 vector<unsigned char> vchPrivKey;
                 ssValue >> vchPrivKey;
-                if (!pwallet->LoadCryptedKey(vchPubKey, vchPrivKey))
+                if(!pwallet->LoadCryptedKey(vchPubKey, vchPrivKey))
                 {
                     printf("Error reading wallet database: LoadCryptedKey failed\n");
                     return DB_CORRUPT;
                 }
                 fIsEncrypted = true;
             }
-            else if (strType == "defaultkey")
+            else if(strType == "defaultkey")
             {
                 ssValue >> pwallet->vchDefaultKey;
             }
-            else if (strType == "pool")
+            else if(strType == "pool")
             {
                 int64 nIndex;
                 ssKey >> nIndex;
                 pwallet->setKeyPool.insert(nIndex);
             }
-            else if (strType == "version")
+            else if(strType == "version")
             {
                 ssValue >> nFileVersion;
-                if (nFileVersion == 10300)
+                if(nFileVersion == 10300)
                     nFileVersion = 300;
             }
-            else if (strType == "cscript")
+            else if(strType == "cscript")
             {
                 uint160 hash;
                 ssKey >> hash;
                 CScript script;
                 ssValue >> script;
-                if (!pwallet->LoadCScript(script))
+                if(!pwallet->LoadCScript(script))
                 {
                     printf("Error reading wallet database: LoadCScript failed\n");
                     return DB_CORRUPT;
@@ -317,10 +317,10 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
 
 
     // Rewrite encrypted wallets of versions 0.4.0 and 0.5.0rc:
-    if (fIsEncrypted && (nFileVersion == 40000 || nFileVersion == 50000))
+    if(fIsEncrypted && (nFileVersion == 40000 || nFileVersion == 50000))
         return DB_NEED_REWRITE;
 
-    if (nFileVersion < CLIENT_VERSION) // Update
+    if(nFileVersion < CLIENT_VERSION) // Update
         WriteVersion(CLIENT_VERSION);
 
     return DB_LOAD_OK;
@@ -330,43 +330,43 @@ void ThreadFlushWalletDB(void* parg)
 {
     const string& strFile = ((const string*)parg)[0];
     static bool fOneThread;
-    if (fOneThread)
+    if(fOneThread)
         return;
     fOneThread = true;
-    if (!GetBoolArg("-flushwallet", true))
+    if(!GetBoolArg("-flushwallet", true))
         return;
 
     unsigned int nLastSeen = nWalletDBUpdated;
     unsigned int nLastFlushed = nWalletDBUpdated;
     int64 nLastWalletUpdate = GetTime();
-    while (!fShutdown)
+    while(!fShutdown)
     {
         Sleep(500);
 
-        if (nLastSeen != nWalletDBUpdated)
+        if(nLastSeen != nWalletDBUpdated)
         {
             nLastSeen = nWalletDBUpdated;
             nLastWalletUpdate = GetTime();
         }
 
-        if (nLastFlushed != nWalletDBUpdated && GetTime() - nLastWalletUpdate >= 2)
+        if(nLastFlushed != nWalletDBUpdated && GetTime() - nLastWalletUpdate >= 2)
         {
             TRY_LOCK(cs_db,lockDb);
-            if (lockDb)
+            if(lockDb)
             {
                 // Don't do this if any databases are in use
                 int nRefCount = 0;
                 map<string, int>::iterator mi = mapFileUseCount.begin();
-                while (mi != mapFileUseCount.end())
+                while(mi != mapFileUseCount.end())
                 {
                     nRefCount += (*mi).second;
                     mi++;
                 }
 
-                if (nRefCount == 0 && !fShutdown)
+                if(nRefCount == 0 && !fShutdown)
                 {
                     map<string, int>::iterator mi = mapFileUseCount.find(strFile);
-                    if (mi != mapFileUseCount.end())
+                    if(mi != mapFileUseCount.end())
                     {
                         printf("%s ", DateTimeStrFormat(GetTime()).c_str());
                         printf("Flushing wallet.dat\n");
@@ -389,13 +389,13 @@ void ThreadFlushWalletDB(void* parg)
 
 bool BackupWallet(const CWallet& wallet, const string& strDest)
 {
-    if (!wallet.fFileBacked)
+    if(!wallet.fFileBacked)
         return false;
-    while (!fShutdown)
+    while(!fShutdown)
     {
         {
             LOCK(cs_db);
-            if (!mapFileUseCount.count(wallet.strWalletFile) || mapFileUseCount[wallet.strWalletFile] == 0)
+            if(!mapFileUseCount.count(wallet.strWalletFile) || mapFileUseCount[wallet.strWalletFile] == 0)
             {
                 // Flush log data to the dat file
                 CloseDb(wallet.strWalletFile);
@@ -406,7 +406,7 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 // Copy wallet.dat
                 filesystem::path pathSrc = GetDataDir() / wallet.strWalletFile;
                 filesystem::path pathDest(strDest);
-                if (filesystem::is_directory(pathDest))
+                if(filesystem::is_directory(pathDest))
                     pathDest /= wallet.strWalletFile;
 
                 try {
