@@ -963,11 +963,15 @@ public:
   unsigned int GetStakeEntropyBit() const
   {
     uint160 hashSig = Hash160(vchBlockSig);
-    if (fDebug && GetBoolArg("-printstakemodifier"))
+
+    if(fDebug && GetBoolArg("-printstakemodifier"))
       printf("GetStakeEntropyBit: hashSig=%s", hashSig.ToString().c_str());
+
     hashSig >>= 159; // take the first bit of the hash
-    if (fDebug && GetBoolArg("-printstakemodifier"))
+
+    if(fDebug && GetBoolArg("-printstakemodifier"))
       printf(" entropybit=%d\n", hashSig.Get64());
+
     return hashSig.Get64();
   }
 
@@ -984,7 +988,8 @@ public:
 
   std::pair<COutPoint, unsigned int> GetProofOfStake() const
   {
-    return IsProofOfStake()? std::make_pair(vtx[1].vin[0].prevout, vtx[1].nTime) : std::make_pair(COutPoint(), (unsigned int)0);
+    return IsProofOfStake() ? std::make_pair(vtx[1].vin[0].prevout, vtx[1].nTime) : 
+      std::make_pair(COutPoint(), (unsigned int)0);
   }
 
   // slimcoin: get max transaction timestamp

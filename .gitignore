@@ -18,6 +18,7 @@ my*
 .\#*
 *emacs*
 .~lock.*
+TAGS
 
 #compilation and Qt preprocessor part
 *.qm

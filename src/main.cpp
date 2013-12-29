@@ -836,6 +836,8 @@ int64 GetProofOfWorkReward(unsigned int nBits)
 
   CBigNum bnDiff = bnTargetLimit / bnTarget;
 
+  int64 nSubsidy = 0;
+
   //resume the regular algorithm if the difficulty is greater than 1250
   if(bnDiff > 1250)
   {
@@ -867,10 +869,10 @@ int64 GetProofOfWorkReward(unsigned int nBits)
         bnLowerBound = bnMidValue;
     }
 
-    int64 nSubsidy = bnUpperBound.getuint64();
+    nSubsidy = bnUpperBound.getuint64();
 
   }else
-    int64 nSubsidy = 1.333333 * bnDiff.getuint64(); //to prevent massive block rewards durring low difficulty
+    nSubsidy = 1.333333 * bnDiff.getuint64(); //to prevent massive block rewards durring low difficulty
 
   nSubsidy = (nSubsidy / CENT) * CENT;
 
@@ -1896,7 +1898,7 @@ bool CBlock::CheckBlock() const
     return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%u nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
 
   // Check coinbase reward
-  if(vtx[0].GetValueOut() > (IsProofOfWork()? (GetProofOfWorkReward(nBits) - vtx[0].GetMinFee() + MIN_TX_FEE) : 0))
+  if(vtx[0].GetValueOut() > (IsProofOfWork() ? (GetProofOfWorkReward(nBits) - vtx[0].GetMinFee() + MIN_TX_FEE) : 0))
     return DoS(50, error("CheckBlock() : coinbase reward exceeded %s > %s", 
                          FormatMoney(vtx[0].GetValueOut()).c_str(),
                          FormatMoney(IsProofOfWork()? GetProofOfWorkReward(nBits) : 0).c_str()));
@@ -3660,7 +3662,7 @@ int64 nLastCoinStakeSearchInterval = 0;
 
 // CreateNewBlock:
 //   fProofOfStake: try (best effort) to make a proof-of-stake block
-CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
+CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 {
   CReserveKey reservekey(pwallet);
 
@@ -3807,16 +3809,19 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
       if(!tx.FetchInputs(txdb, mapTestPoolTmp, false, true, mapInputs, fInvalid))
         continue;
 
-      int64 nTxFees = tx.GetValueIn(mapInputs)-tx.GetValueOut();
+      int64 nTxFees = tx.GetValueIn(mapInputs) - tx.GetValueOut();
+
       if(nTxFees < nMinFee)
         continue;
 
       nTxSigOps += tx.GetP2SHSigOpCount(mapInputs);
+
       if(nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS)
         continue;
 
       if(!tx.ConnectInputs(txdb, mapInputs, mapTestPoolTmp, CDiskTxPos(1,1,1), pindexPrev, false, true))
         continue;
+
       mapTestPoolTmp[tx.GetHash()] = CTxIndex(CDiskTxPos(1,1,1), tx.vout.size());
       swap(mapTestPool, mapTestPoolTmp);
 
@@ -3849,19 +3854,24 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
       printf("CreateNewBlock(): total size %lu\n", nBlockSize);
 
   }
+
   if(pblock->IsProofOfWork())
     pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
 
   // Fill in header
-  pblock->hashPrevBlock  = pindexPrev->GetBlockHash();
+  pblock->hashPrevBlock = pindexPrev->GetBlockHash();
   pblock->hashMerkleRoot = pblock->BuildMerkleTree();
+
   if(pblock->IsProofOfStake())
-    pblock->nTime      = pblock->vtx[1].nTime; //same as coinstake timestamp
-  pblock->nTime          = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
-  pblock->nTime          = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
+    pblock->nTime = pblock->vtx[1].nTime; //same as coinstake timestamp
+
+  pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
+  pblock->nTime = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
+
   if(pblock->IsProofOfWork())
     pblock->UpdateTime(pindexPrev);
-  pblock->nNonce         = 0;
+
+  pblock->nNonce = 0;
 
   return pblock.release();
 }
