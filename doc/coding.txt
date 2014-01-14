@@ -95,7 +95,7 @@ in 500ms.
 ThreadRPCServer : Remote procedure call handler, listens on port 8332
 for connections and services them.
 
-ThreadBitcoinMiner : Generates bitcoins
+ThreadSlimcoinMiner : Generates bitcoins
 
 ThreadMapPort : Universal plug-and-play startup/shutdown
 

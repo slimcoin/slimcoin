@@ -20,7 +20,7 @@ inline int Testuint256AdHoc(std::vector<std::string> vArg);
 
 
 /** Base class without constructors for uint256 and uint160.
- * This makes the compiler let u use it in a union.
+ * This makes the compiler let you use it in a union.
  */
 template<unsigned int BITS>
 class base_uint

@@ -16,6 +16,12 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/interprocess/sync/file_lock.hpp>
 
+
+///////
+#include "dcrypt.h"
+///////
+
+
 #ifndef WIN32
 #include <signal.h>
 #endif
@@ -100,7 +106,7 @@ void HandleSIGTERM(int)
 
 
 
-
+char out[SHA256_LEN + 1];
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -110,6 +116,10 @@ void HandleSIGTERM(int)
 int main(int argc, char **argv)
 {
   bool fRet = false;
+
+  uint8_t hash_digest[SHA256_DIGEST_LENGTH];
+  dcrypt((char*)"Testing", out, hash_digest);
+
   fRet = AppInit(argc, argv);
 
   if(fRet && fDaemon)
@@ -334,6 +344,8 @@ bool AppInit2(int argc, char* argv[])
 
   if(!fDebug)
     ShrinkDebugFile();
+
+  printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++DCRYPT HASH is %s\n", out);
 
   printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
   printf("SLIMCoin version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());

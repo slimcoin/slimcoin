@@ -3978,9 +3978,9 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
   return true;
 }
 
-void static ThreadBitcoinMiner(void* parg);
+void static ThreadSlimcoinMiner(void* parg);
 
-static bool fGenerateBitcoins = false;
+static bool fGenerateSlimcoins = false;
 static bool fLimitProcessors = false;
 static int nLimitProcessors = -1;
 
@@ -3993,7 +3993,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
   CReserveKey reservekey(pwallet);
   unsigned int nExtraNonce = 0;
 
-  while(fGenerateBitcoins || fProofOfStake)
+  while(fGenerateSlimcoins || fProofOfStake)
   {
     if(fShutdown)
       return;
@@ -4002,7 +4002,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
       Sleep(1000);
       if(fShutdown)
         return;
-      if((!fGenerateBitcoins) && !fProofOfStake)
+      if((!fGenerateSlimcoins) && !fProofOfStake)
         return;
     }
 
@@ -4137,7 +4137,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
       // Check for stop or if block needs to be rebuilt
       if(fShutdown)
         return;
-      if(!fGenerateBitcoins)
+      if(!fGenerateSlimcoins)
         return;
       if(fLimitProcessors && vnThreadsRunning[THREAD_MINER] > nLimitProcessors)
         return;
@@ -4161,7 +4161,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
   }
 }
 
-void static ThreadBitcoinMiner(void* parg)
+void static ThreadSlimcoinMiner(void* parg)
 {
   CWallet* pwallet = (CWallet*)parg;
   try
@@ -4169,43 +4169,53 @@ void static ThreadBitcoinMiner(void* parg)
     vnThreadsRunning[THREAD_MINER]++;
     BitcoinMiner(pwallet, false);
     vnThreadsRunning[THREAD_MINER]--;
-  }
-  catch (std::exception& e) {
+  }catch(std::exception& e)
+  {
     vnThreadsRunning[THREAD_MINER]--;
-    PrintException(&e, "ThreadBitcoinMiner()");
-  } catch (...) {
+    PrintException(&e, "ThreadSlimcoinMiner()");
+  }catch(...)
+  {
     vnThreadsRunning[THREAD_MINER]--;
-    PrintException(NULL, "ThreadBitcoinMiner()");
+    PrintException(NULL, "ThreadSlimcoinMiner()");
   }
+
   nHPSTimerStart = 0;
-  if(vnThreadsRunning[THREAD_MINER] == 0)
+
+  if(!vnThreadsRunning[THREAD_MINER] == 0)
     dHashesPerSec = 0;
-  printf("ThreadBitcoinMiner exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINER]);
+
+  printf("ThreadSlimcoinMiner exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINER]);
 }
 
-
-void GenerateBitcoins(bool fGenerate, CWallet* pwallet)
+void GenerateSlimcoins(bool fGenerate, CWallet* pwallet)
 {
-  fGenerateBitcoins = fGenerate;
+  fGenerateSlimcoins = fGenerate;
   nLimitProcessors = GetArg("-genproclimit", -1);
-  if(nLimitProcessors == 0)
-    fGenerateBitcoins = false;
+
+  if(!nLimitProcessors)
+    fGenerateSlimcoins = false;
+
   fLimitProcessors = (nLimitProcessors != -1);
 
   if(fGenerate)
   {
     int nProcessors = boost::thread::hardware_concurrency();
     printf("%d processors\n", nProcessors);
+
     if(nProcessors < 1)
       nProcessors = 1;
+
     if(fLimitProcessors && nProcessors > nLimitProcessors)
       nProcessors = nLimitProcessors;
+
     int nAddThreads = nProcessors - vnThreadsRunning[THREAD_MINER];
     printf("Starting %d BitcoinMiner threads\n", nAddThreads);
+
     for(int i = 0; i < nAddThreads; i++)
     {
-      if(!CreateThread(ThreadBitcoinMiner, pwallet))
-        printf("Error: CreateThread(ThreadBitcoinMiner) failed\n");
+      if(!CreateThread(ThreadSlimcoinMiner, pwallet))
+        printf("Error: CreateThread(ThreadSlimcoinMiner) failed\n");
+
       Sleep(10);
     }
   }
