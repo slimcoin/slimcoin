@@ -16,6 +16,10 @@
 
 #include <list>
 
+//the size of the block to hash
+#define HASH_PBLOCK_SIZE(pblock)  UEND(pblock->nNonce) - UBEGIN(pblock->nVersion)
+#define HASH_BLOCK_SIZE(block)    UEND(block.nNonce) - UBEGIN(block.nVersion)
+
 class CWallet;
 class CBlock;
 class CBlockIndex;
@@ -949,6 +953,8 @@ public:
 
   uint256 GetHash() const
   {
+    //~ printf("size %d, size %d\n", UEND(this->nNonce) - UBEGIN(this->nVersion), sizeof(UBEGIN(this->nVersion)[0]));
+    //~ return dcrypt(UBEGIN(this->nVersion), sizeof(CBlock));
     return Hash(BEGIN(nVersion), END(nNonce));
   }
 

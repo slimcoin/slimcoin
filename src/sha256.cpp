@@ -1,11 +1,10 @@
-#include <openssl/sha.h>   //for the sha256
 #include <string.h>        //for strlen
 
 #include "sha256.h"
 
-void digest_to_string(uint8_t *hash_digest, char *string)
+static void digest_to_string(u8int *hash_digest, u8int *string)
 {
-  register uint8_t tmp_val;
+  register u8int tmp_val;
 
   uint32_t i = 0;
   for(; i < SHA256_DIGEST_LENGTH; i++)
@@ -36,11 +35,17 @@ void digest_to_string(uint8_t *hash_digest, char *string)
   return;
 }
 
-void sha256(char *string, char *outputBuffer, uint8_t *hash_digest)
+//optional arg hash_digest
+void sha256_to_str(const u8int *data, size_t data_sz, u8int *outputBuffer, u8int *hash_digest)
 {
   SHA256_CTX sha256;
+  static u8int __digest__[SHA256_DIGEST_LENGTH];
+
+  if(hash_digest == NULL)
+    hash_digest = __digest__;
+
   SHA256_Init(&sha256);
-  SHA256_Update(&sha256, string, strlen(string));
+  SHA256_Update(&sha256, data, data_sz);
   SHA256_Final(hash_digest, &sha256);
 
   //convert the digest to a string
@@ -50,12 +55,31 @@ void sha256(char *string, char *outputBuffer, uint8_t *hash_digest)
   return;
 }
 
-void sha256_salt(char *string, char *salt, char *outputBuffer, uint8_t *hash_digest)
+//optional arg hash_digest
+//same code from openssl lib, just a bit more specialized
+uint256 sha256(const u8int *data, size_t data_sz, uint256 *hash_digest)
+{
+  SHA256_CTX hash;
+  static uint256 m;
+
+  if(!hash_digest)
+    hash_digest = &m;
+
+  SHA256_Init(&hash);
+  SHA256_Update(&hash, data, data_sz);
+  SHA256_Final((u8int*)hash_digest, &hash);
+  //~ OPENSSL_cleanse(&hash, sizeof(hash));
+
+  return *hash_digest;
+}
+
+void sha256_salt_to_str(const u8int *data, size_t data_sz, u8int *salt, size_t salt_sz, 
+                        u8int *outputBuffer, u8int *hash_digest)
 {
   SHA256_CTX sha256;
   SHA256_Init(&sha256);
-  SHA256_Update(&sha256, string, strlen(string));
-  SHA256_Update(&sha256, salt, strlen(salt));
+  SHA256_Update(&sha256, data, data_sz);
+  SHA256_Update(&sha256, salt, salt_sz);
   SHA256_Final(hash_digest, &sha256);
 
   //convert the digest to a string

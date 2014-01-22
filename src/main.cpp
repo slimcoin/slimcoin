@@ -14,6 +14,9 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
+
+#include "dcrypt.h"
+
 using namespace std;
 using namespace boost;
 
@@ -32,8 +35,8 @@ unsigned int nTransactionsUpdated = 0;
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
-static CBigNum bnProofOfWorkLimit(~uint256(0) >> 32);
-static CBigNum bnInitialHashTarget(~uint256(0) >> 40);
+static CBigNum bnProofOfWorkLimit(~uint256(0) >> 32); //8 preceding 0s, 32/4 since every hex = 4 bits
+static CBigNum bnInitialHashTarget(~uint256(0) >> 40); //10 preceding 0s, 40/4 since every hex = 4 bits
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
 int nCoinbaseMaturity = COINBASE_MATURITY_SMC;
 CBlockIndex* pindexGenesisBlock = NULL;
@@ -65,7 +68,8 @@ int64 nHPSTimerStart;
 // Settings
 int64 nTransactionFee = MIN_TX_FEE;
 
-
+// Dcrypt hash scanner
+static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone);
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -923,6 +927,7 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 {
   while(pindex && pindex->pprev && (pindex->IsProofOfStake() != fProofOfStake))
     pindex = pindex->pprev;
+
   return pindex;
 }
 
@@ -942,13 +947,19 @@ unsigned int static GetNextTargetRequired(const CBlockIndex* pindexLast, bool fP
 
   // slimcoin: target change every block
   // slimcoin: retarget with exponential moving toward target spacing
+
+  //use the last blocks target as a seed
   CBigNum bnNew;
   bnNew.SetCompact(pindexPrev->nBits);
-  int64 nTargetSpacing = fProofOfStake ? STAKE_TARGET_SPACING : min(nTargetSpacingWorkMax, (int64) STAKE_TARGET_SPACING * (1 + pindexLast->nHeight - pindexPrev->nHeight));
+
+  int64 nTargetSpacing = fProofOfStake ? STAKE_TARGET_SPACING : 
+    min(nTargetSpacingWorkMax, (int64) STAKE_TARGET_SPACING * (1 + pindexLast->nHeight - pindexPrev->nHeight));
+
   int64 nInterval = nTargetTimespan / nTargetSpacing;
   bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
   bnNew /= ((nInterval + 1) * nTargetSpacing);
 
+  //we can't make it too easy
   if(bnNew > bnProofOfWorkLimit)
     bnNew = bnProofOfWorkLimit;
 
@@ -2215,7 +2226,7 @@ static unsigned int nCurrentBlockFile = 1;
 FILE* AppendBlockFile(unsigned int& nFileRet)
 {
   nFileRet = 0;
-  loop
+  for(;;)
   {
     FILE* file = OpenBlockFile(nCurrentBlockFile, 0, "ab");
     if(!file)
@@ -2238,10 +2249,10 @@ bool LoadBlockIndex(bool fAllowNew)
   if(fTestNet)
   {
     hashGenesisBlock = hashGenesisBlockTestNet;
-    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 28);
+    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 28); //7 preceding 0s, 28/4 since every hex = 4 bits
     nStakeMinAge = 60 * 60 * 24; // test net min age is 1 day
     nCoinbaseMaturity = 60;
-    bnInitialHashTarget = CBigNum(~uint256(0) >> 29);
+    bnInitialHashTarget = CBigNum(~uint256(0) >> 29); //0x00000007ffff.....
     nModifierInterval = 60 * 20; // test net modifier interval is 20 minutes
   }
 
@@ -2260,7 +2271,7 @@ bool LoadBlockIndex(bool fAllowNew)
   //
   // Init with genesis block
   //
-  if(mapBlockIndex.empty())
+  if(mapBlockIndex.empty() || true)
   {
     if(!fAllowNew)
       return false;
@@ -2295,6 +2306,66 @@ bool LoadBlockIndex(bool fAllowNew)
     printf("hashGenesisBlock = %s\n", hashGenesisBlock.ToString().c_str());
     printf("block.hashMerkleRoot = %s\n", block.hashMerkleRoot.ToString().c_str());
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////// 
+
+    //I also included dcrypt.h up above, be sure of that
+    u32int hashes_done;
+    uint256 phash;
+    block.nNonce = 0;
+    // while(block.nNonce < 0xffff0000)
+    // {
+    //   //~ if(ScanDcryptHash(&block, &hashes_done) != (u32int)-1)
+    //     //~ break;
+
+    //   for(;;block.nNonce++)
+    //   {
+    //     //~ phash = sha256((const u8int*)&block, sizeof(CBlock));
+    //     phash = dcrypt((const u8int*)&block, sizeof(CBlock));
+    //     if(!uint256_get_top<u8int>(phash))
+    //     {
+    //       //~ printf("\nMagical number %llx\n", ((uint64*)&phash)[3]);
+    //       //~ printf("\nMagical number %llx\n", uint256_get_top<int64>(phash));
+    //       printf("Good hash %s\n", phash.ToString().c_str());
+    //       assert(false);
+    //     }
+    //   }
+
+    //   printf("Looped! nNonce is 0x%x\n", block.nNonce);
+    // }
+
+    // assert(false);
+
+    for(;;block.nNonce++)
+    {
+      if(ScanDcryptHash(&block, &hashes_done) != (u32int)-1)
+        break;
+
+      if(block.nNonce > 0xffff0000)
+      {
+        block.nTime++;
+        block.nNonce = 0;
+      }
+
+      printf("Looped! nNonce is 0x%x\n", block.nNonce);
+    }
+
+    phash = dcrypt(UBEGIN(block.nVersion), HASH_BLOCK_SIZE(block));
+
+    printf("\n\nGood Hash %s\n", phash.ToString().c_str());
+
+    printf("Good Block Get Hash %s, Nonce %d, block time %d\n\n", 
+           block.GetHash().ToString().c_str(), block.nNonce, block.nTime);
+
+    assert(false);
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////// 
+
     assert(block.hashMerkleRoot == uint256("0x6561fdf42da044631a835cad31128929d8b95fde6ce3e4f89cff8d710d8af927"));
     block.print();
 
@@ -2326,41 +2397,6 @@ bool LoadBlockIndex(bool fAllowNew)
       printf("NEW block.nNonce = %d\n", block.nNonce);
       printf("NEW block.GetHash = %s\n", block.GetHash().ToString().c_str());
     }
-
-    // If genesis block hash // does not match, then generate new genesis hash.
-    // if(false && block.GetHash() != hashGenesisBlock)
-    // {
-    //   cout << "Searching for genesis block..." << endl;
-    //   // This will figure out a valid hash and Nonce if you're
-    //   // creating a different genesis block:
-    //   uint256 hashTarget = CBigNum().SetCompact(block.nBits).getuint256();
-    //   uint256 thash;
-
-    //   for(;;)
-    //   {
-    //     thash = scrypt_hash(BEGIN(block.nVersion), 80);
-    //     if(thash <= hashTarget)
-    //       break;
-
-    //     if(!(block.nNonce & 0xFFF))
-    //       printf("nonce %d: hash = %s (target = %s)\n", block.nNonce, thash.ToString().c_str(), 
-    //              hashTarget.ToString().c_str());
-
-    //     ++block.nNonce;
-    //     if(!block.nNonce)
-    //     {
-    //       cout << "NONCE WRAPPED, incrementing time" << endl;
-    //       ++block.nTime;
-    //     }
-    //   }
-    //   printf("NEW block.nTime = %d\n", block.nTime);
-    //   printf("NEW block.nNonce = %d\n", block.nNonce);
-    //   printf("NEW block.GetHash = %s\n", block.GetHash().ToString().c_str());
- 
-    //   //~ cout << "NEW block.nTime = " << block.nTime << endl;
-    //   //~ cout << "NEW block.nNonce = " << block.nNonce << endl;
-    //   //~ cout << "NEW block.GetHash = " << block.GetHash().ToString().c_str() << endl;
-    // }
 
     assert(block.GetHash() == hashGenesisBlock);
     assert(block.CheckBlock());
@@ -3284,7 +3320,7 @@ bool ProcessMessages(CNode* pfrom)
     nTimeLastPrintMessageStart = GetAdjustedTime();
   }
 
-  loop
+  for(;;)
   {
     // Scan for message start
     CDataStream::iterator pstart = search(vRecv.begin(), vRecv.end(), BEGIN(pchMessageStart), END(pchMessageStart));
@@ -3607,7 +3643,8 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit)
 // between calls, but periodically or if nNonce is 0xffff0000 or above,
 // the block is rebuilt and nNonce starts over at zero.
 //
-unsigned int static ScanHash_CryptoPP(char* pmidstate, char* pdata, char* phash1, char* phash, unsigned int& nHashesDone)
+unsigned int static ScanHash_CryptoPP(char* pmidstate, char* pdata, char* phash1,
+                                      char* phash, unsigned int& nHashesDone)
 {
   unsigned int& nNonce = *(unsigned int*)(pdata + 12);
   for(;;)
@@ -3628,6 +3665,42 @@ unsigned int static ScanHash_CryptoPP(char* pmidstate, char* pdata, char* phash1
     if((nNonce & 0xffff) == 0)
     {
       nHashesDone = 0xffff+1;
+      return (unsigned int) -1;
+    }
+  }
+}
+
+//
+// ScanDcryptHash scans nonces looking for a hash with at least some zero bits.
+// It operates on big endian data.  Caller does the byte reversing.
+// All input buffers are 16-byte aligned.  nNonce is usually preserved
+// between calls, but periodically or if nNonce is 0xffff0000 or above,
+// the block is rebuilt and nNonce starts over at zero.
+//
+static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone)
+{
+  u32int *nNonce = &pblock->nNonce;
+  static uint8_t digest[DCRYPT_DIGEST_LENGTH];
+  uint256 phash;
+
+  for(;;)
+  {
+    //hash the block
+    (*nNonce)++;
+    phash = dcrypt(UBEGIN(pblock->nVersion), HASH_PBLOCK_SIZE(pblock), digest);
+
+    // Return the nonce if the top 16 bits of the hash are all 0s,
+    // caller will check if it has enough to reach the target
+    if(!uint256_get_top<u16int>(phash))
+    {
+      printf("\n\nFound Hash %s, Nonce %d, block time %d\n\n", phash.ToString().c_str(), *nNonce, pblock->nTime);
+      return *nNonce;
+    }
+
+    // If nothing found after trying for a while, return -1
+    if(!(*nNonce & 0xffff))
+    {
+      *nHashesDone = 0xffff + 1;
       return (unsigned int) -1;
     }
   }
@@ -4069,7 +4142,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
     uint256 hashbuf[2];
     uint256& hash = *alignup<16>(hashbuf);
 
-    loop
+    for(;;)
     {
       unsigned int nHashesDone = 0;
       unsigned int nNonceFound;
@@ -4106,13 +4179,13 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
 
       // Meter hashes/sec
       static int64 nHashCounter;
-      if(nHPSTimerStart == 0)
+      if(!nHPSTimerStart)
       {
         nHPSTimerStart = GetTimeMillis();
         nHashCounter = 0;
-      }
-      else
+      }else
         nHashCounter += nHashesDone;
+
       if(GetTimeMillis() - nHPSTimerStart > 4000)
       {
         static CCriticalSection cs;
@@ -4151,10 +4224,11 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
         break;
 
       // Update nTime every few seconds
-      pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
+      pblock->nTime = max(pindexPrev->GetMedianTimePast() + 1, pblock->GetMaxTransactionTime());
       pblock->nTime = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
       pblock->UpdateTime(pindexPrev);
       nBlockTime = ByteReverse(pblock->nTime);
+
       if(pblock->GetBlockTime() >= (int64)pblock->vtx[0].nTime + nMaxClockDrift)
         break;  // need to update coinbase timestamp
     }

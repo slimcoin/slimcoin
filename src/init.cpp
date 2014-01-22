@@ -103,11 +103,6 @@ void HandleSIGTERM(int)
   fRequestShutdown = true;
 }
 
-
-
-
-char out[SHA256_LEN + 1];
-
 //////////////////////////////////////////////////////////////////////////////
 //
 // Start
@@ -117,8 +112,20 @@ int main(int argc, char **argv)
 {
   bool fRet = false;
 
-  uint8_t hash_digest[SHA256_DIGEST_LENGTH];
-  dcrypt((char*)"Testing", out, hash_digest);
+#if DEBUG_INIT
+  fPrintToConsole = true;
+  printf("!!!!!!!!!Automatically set printtoconsole to true for debug!!!!!!!!!\n");
+  printf("!!!!!!!!!set DEBUG_INIT to false when commiting!!!!!!!!!\n");
+
+  //I also included dcrypt.h up above, be sure of that
+
+  uint256 out;
+
+  //~ sha256((const uint8_t*)"Testing", 7, &out);
+  out = dcrypt((const uint8_t*)"Testing", 0);
+
+  printf("DCRYPT HASH is %s\n", out.ToString().c_str());
+#endif
 
   fRet = AppInit(argc, argv);
 
@@ -344,8 +351,6 @@ bool AppInit2(int argc, char* argv[])
 
   if(!fDebug)
     ShrinkDebugFile();
-
-  printf("++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++DCRYPT HASH is %s\n", out);
 
   printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
   printf("SLIMCoin version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());

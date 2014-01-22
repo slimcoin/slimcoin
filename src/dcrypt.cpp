@@ -3,6 +3,8 @@
 #include <math.h>          //pow
 #include <assert.h>        //for assert
 
+#include "uint256.h"
+#include "main.h"
 #include "dcrypt.h"
 
 //expand the hash transfer size 0 times
@@ -11,7 +13,9 @@
 //the base size for realloc will be 1MB
 #define REALLOC_BASE_SZ   (1024 * 1024)
 
-uint32_t hex_char_to_int(char c)
+uint8_t dcrypt_hashdigest[SHA256_DIGEST_LENGTH];
+
+uint32_t hex_char_to_int(uint8_t c)
 {
   if(c >= '0' && c <= '9')
     return c - '0';
@@ -25,23 +29,20 @@ uint32_t hex_char_to_int(char c)
   return -1;
 }
 
-void join_to_array(char *array, char join)
+inline void join_to_array(uint8_t *array, uint8_t join)
 {
   *(array + SHA256_LEN) = join;
   return;
 }
 
-void extend_array(char **array, unsigned long long used_array_sz, 
-                  char *extend, uint32_t extend_sz, uint8_t hashed_end)
+void extend_array(uint8_t **array, unsigned long long used_array_sz, 
+                  uint8_t *extend, uint32_t extend_sz, uint8_t hashed_end)
 {
   if(!array)
     return;
 
   static unsigned long long actual_array_sz = 0;
   static uint32_t times_realloced = 0;
-
-  //~ printf("Wow %lld < %d times realloc'd %d\n", (*actual_array_sz - used_array_sz), 
-         //~ (extend_sz + hashed_end), *times_realloced);
 
   //if there is not enough room
   if((actual_array_sz - used_array_sz) < (extend_sz + hashed_end))
@@ -52,14 +53,14 @@ void extend_array(char **array, unsigned long long used_array_sz,
       printf("IP\n");
       //reallocate on an exponential curve, modern computers have plenty ram
       actual_array_sz += pow(2, times_realloced++) * REALLOC_BASE_SZ;
-      *array = (char*)realloc(*array, actual_array_sz);
+      *array = (uint8_t*)realloc(*array, actual_array_sz);
     }else
     {
       //allocate the base size
       actual_array_sz += REALLOC_BASE_SZ;
       times_realloced++;
 
-      *array = (char*)malloc(actual_array_sz); //if we have not allocated anything, malloc
+      *array = (uint8_t*)malloc(actual_array_sz); //if we have not allocated anything, malloc
     }
   }
 
@@ -76,7 +77,7 @@ void extend_array(char **array, unsigned long long used_array_sz,
   return;
 }
 
-void expand_hash(char *hash, char *salt, uint8_t *hash_digest, uint32_t expand_times, char *output)
+void expand_hash(uint8_t *hash, uint8_t *salt, uint8_t *hash_digest, uint32_t expand_times, uint8_t *output)
 {
   if(!expand_times)
   {
@@ -84,20 +85,22 @@ void expand_hash(char *hash, char *salt, uint8_t *hash_digest, uint32_t expand_t
     return;
   }
 
-  //set all of char *output to 0x0
+  //set all of uint8_t *output to 0x0
   memset(output, 0x0, (expand_times + 1) * SHA256_LEN);
 
-  //copy the hash over to char *output
+  //copy the hash over to uint8_t *output
   memcpy(output, hash, SHA256_LEN);
 
   uint32_t i;
   for(i = 0; i < expand_times; i++)
   {
-    //get the salt by hashing what is in output
-    sha256(output, salt, hash_digest);
+    //TODO, dectrypt needs all sha256 changed to sha256_to_str and just the final one be sha256
 
-    //hash char *output with the salt
-    sha256_salt(output, salt, hash, hash_digest);
+    //get the salt by hashing what is in output
+    sha256_to_str(output, (i + 1) * SHA256_LEN, salt, hash_digest);
+
+    //hash uint8_t *output with the salt
+    sha256_salt_to_str(output, (i + 1) * SHA256_LEN, salt, SHA256_LEN, hash, hash_digest);
 
     //append the new hash to the end of output, i + 1 is to offset the original hash added at the beginning
     memcpy(output + (i + 1) * SHA256_LEN, hash, SHA256_LEN);
@@ -106,30 +109,30 @@ void expand_hash(char *hash, char *salt, uint8_t *hash_digest, uint32_t expand_t
   return;
 }
 
-char *hash_append(char **str_nums, uint32_t n_str, uint8_t *hash_digest)
+uint8_t *hash_append(char **str_nums, uint32_t n_str, uint8_t *hash_digest)
 {
-  char *appended;
-  appended = (char*)malloc(n_str * SHA256_LEN);
+  uint8_t *appended;
+  appended = (uint8_t*)malloc(n_str * SHA256_LEN);
 
   uint32_t i;
   for(i = 0; i < n_str; i++)
-    sha256(*(str_nums + i), appended + i * SHA256_LEN, hash_digest);
+    sha256_to_str((const uint8_t*)*(str_nums + i), strlen(*(str_nums + i)), appended + i * SHA256_LEN, hash_digest);
 
   return appended;
 }
 
-uint32_t rehash_pairs(char *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
+uint32_t rehash_pairs(uint8_t *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
 {
   uint32_t hashed_nums_len = n_str * SHA256_LEN;
-  char **new_hash;
-  new_hash = (char**)malloc(sizeof(char*) * n_str);
+  uint8_t **new_hash;
+  new_hash = (uint8_t**)malloc(sizeof(uint8_t*) * n_str);
 
   uint32_t i, h = 0, j = 0;
 
   //allocate for the hashes in new_hash
   for(i = 0; i < n_str; i++)
   {
-    *(new_hash + i) = (char*)malloc(SHA256_LEN + 1);
+    *(new_hash + i) = (uint8_t*)malloc(SHA256_LEN + 1);
     *(*(new_hash + i) + SHA256_LEN) = 0; //set the termanating \000
   }
 
@@ -151,7 +154,7 @@ uint32_t rehash_pairs(char *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
   //do the actuall rehashing
   for(i = 0; i < n_str; i++)
   {
-    sha256(*(new_hash + i), hashed_nums + i * SHA256_LEN, hash_digest);
+    sha256_to_str(*(new_hash + i), SHA256_LEN, hashed_nums + i * SHA256_LEN, hash_digest);
     free(*(new_hash + i));
   }
 
@@ -161,23 +164,26 @@ uint32_t rehash_pairs(char *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
   return 0;
 }
 
-char *mix_hashed_nums(char *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
+uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_hash, uint8_t *hash_digest)
 {
   uint8_t hashed_end = false;
   uint32_t i, index = 0, hashed_nums_len = n_str * SHA256_LEN;
-  unsigned long long count;
-  char tmp_val, *tmp_array, *new_hash = 0;
-  tmp_array = (char*)calloc(SHA256_LEN + 2, sizeof(char)); // +1 for the joining char and +1 for the \000
+  uint64 count;
+  uint8_t tmp_val, tmp_array[SHA256_LEN + 2], *new_hash = 0;
+
+  //set the first hash length in the temp array to all 0xff
+  memset(tmp_array, 0xff, SHA256_LEN);
+  //set the last two bytes to \000
+  *(tmp_array + SHA256_LEN) = *(tmp_array + SHA256_LEN + 1) = 0;
 
 //only define those arrays/variables if EXPAND_HASH_TIMES != 0
 #if EXPAND_HASH_TIMES
-  char *expanded_hash, *salt;
   const uint32_t expand_times = EXPAND_HASH_TIMES;
   //expand_times + 1 since if expand = 0, then the expanded_hash will have the same size as the original hash
   const uint32_t expanded_hash_sz = (expand_times + 1) * SHA256_LEN;
-  expanded_hash = (char*)malloc(expanded_hash_sz);
 
-  salt = (char*)malloc(SHA256_LEN + 1); // +1 for the \000
+  uint8_t expanded_hash[expanded_hash_sz], salt[SHA256_LEN + 1];
+
 #endif
 
   for(count = 0; hashed_end == false; count++)
@@ -194,7 +200,7 @@ char *mix_hashed_nums(char *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
     
     tmp_val = *(hashed_nums + index);
     join_to_array(tmp_array, tmp_val);
-    sha256(tmp_array, tmp_array, hash_digest);
+    sha256_to_str(tmp_array, SHA256_LEN + 1, tmp_array, hash_digest);
 
     //check if the last value of hashed_nums is the same as the last value in tmp_array
     if(index == hashed_nums_len - 1)
@@ -215,71 +221,53 @@ char *mix_hashed_nums(char *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
 
   }
 
-  //~ printf("count %lld, %d Mil\n", count, (uint32_t)(count / 1000000));
-
-  //~ long long bytes = strlen(new_hash) + 1;
-  //~ printf("Size of final: %lld bytes %lld KB %f MB |||||\n", bytes, bytes / 1024, ((float)bytes) / (1024 * 1024));
-
-
-  free(tmp_array);
+  *mixed_hash = new_hash;
 
 //these were not created if EXPAND_HASH_TIME == 0
 #if EXPAND_HASH_TIMES
-  free(expanded_hash);
-  free(salt);
+  return count * expanded_hash_sz;
+#else
+  return count * SHA256_LEN;
 #endif
 
-  return new_hash;
 }
 
-uint32_t dcrypt(char **str_nums, uint32_t n_str, char *out_hash, uint8_t *hash_digest)
+uint256 dcrypt(char **str_nums, uint32_t n_str, char *out_hash, uint8_t *hash_digest)
 {
-  char *hashed_nums, *mix_hash;
+  uint8_t *hashed_nums, *mix_hash;
+  uint256 hash;
 
   //append the hashes
   hashed_nums = hash_append(str_nums, n_str, hash_digest);
 
-  //~ printf("DONE with hash_append\n");
-
   //mix the hashes up, magority of the time takes here
-  mix_hash = mix_hashed_nums(hashed_nums, n_str, hash_digest);
-
-  //~ printf("DONE with mix_hash");
+  uint64 mix_hash_len = mix_hashed_nums(hashed_nums, n_str, &mix_hash, hash_digest);
 
   //apply the final hash to the output
-  sha256(mix_hash, out_hash, hash_digest);
-
-  //~ printf(" Done with final hash!\n");
+  sha256((const uint8_t*)mix_hash, mix_hash_len, &hash);
 
   free(hashed_nums);
   free(mix_hash);
 
   //sucess
-  return 0;
+  return hash;
 }
 
-uint32_t dcrypt(char *str_nums, char *out_hash, uint8_t *hash_digest)
+uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
 {
-  char *hashed_nums, *mix_hash;
+  uint8_t hashed_nums[SHA256_LEN + 1], *mix_hash;
+  uint256 hash;
 
-  hashed_nums = (char*)malloc(SHA256_LEN + 1);
-  sha256(str_nums, hashed_nums, hash_digest);
-
-  //~ printf("DONE with hash_append\n");
+  sha256_to_str(data, data_sz, hashed_nums, hash_digest);
 
   //mix the hashes up, magority of the time takes here
-  mix_hash = mix_hashed_nums(hashed_nums, 1, hash_digest);
-
-  //~ printf("DONE with mix_hash");
+  uint64 mix_hash_len = mix_hashed_nums(hashed_nums, 1, &mix_hash, hash_digest);
 
   //apply the final hash to the output
-  sha256(mix_hash, out_hash, hash_digest);
+  sha256((const uint8_t*)mix_hash, mix_hash_len, &hash);
 
-  //~ printf(" Done with final hash!\n");
-
-  free(hashed_nums);
   free(mix_hash);
 
   //sucess
-  return 0;
+  return hash;
 }
