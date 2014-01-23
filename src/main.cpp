@@ -35,8 +35,8 @@ unsigned int nTransactionsUpdated = 0;
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
-static CBigNum bnProofOfWorkLimit(~uint256(0) >> 32); //8 preceding 0s, 32/4 since every hex = 4 bits
-static CBigNum bnInitialHashTarget(~uint256(0) >> 40); //10 preceding 0s, 40/4 since every hex = 4 bits
+static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
+static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007ffff....
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
 int nCoinbaseMaturity = COINBASE_MATURITY_SMC;
 CBlockIndex* pindexGenesisBlock = NULL;
@@ -2249,15 +2249,19 @@ bool LoadBlockIndex(bool fAllowNew)
   if(fTestNet)
   {
     hashGenesisBlock = hashGenesisBlockTestNet;
-    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 28); //7 preceding 0s, 28/4 since every hex = 4 bits
+    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
     nStakeMinAge = 60 * 60 * 24; // test net min age is 1 day
     nCoinbaseMaturity = 60;
-    bnInitialHashTarget = CBigNum(~uint256(0) >> 29); //0x00000007ffff.....
+    bnInitialHashTarget = CBigNum(~uint256(0) >> 17); //0x00007ffff.....
     nModifierInterval = 60 * 20; // test net modifier interval is 20 minutes
   }
 
-  printf("%s Network: genesis=0x%s nBitsLimit=0x%08x nBitsInitial=0x%08x nStakeMinAge=%d nCoinbaseMaturity=%d nModifierInterval=%d\n",
-         fTestNet? "Test" : "SLIMCoin", hashGenesisBlock.ToString().substr(0, 20).c_str(), bnProofOfWorkLimit.GetCompact(), bnInitialHashTarget.GetCompact(), nStakeMinAge, nCoinbaseMaturity, nModifierInterval);
+  printf("%s Network: \n\tgenesis=0x%s \n\tnBitsLimit=0x%08x \n\tnBitsInitial=0x%08x\n", 
+         fTestNet ? "Test" : "SLIMCoin", hashGenesisBlock.ToString().substr(0, 20).c_str(),
+         bnProofOfWorkLimit.GetCompact(), bnInitialHashTarget.GetCompact());
+
+  printf("\tnStakeMinAge=%d \n\tnCoinbaseMaturity=%d \n\tnModifierInterval=%d\n\n",
+         nStakeMinAge, nCoinbaseMaturity, nModifierInterval);
 
   //
   // Load block index
@@ -2271,7 +2275,7 @@ bool LoadBlockIndex(bool fAllowNew)
   //
   // Init with genesis block
   //
-  if(mapBlockIndex.empty() || true)
+  if(mapBlockIndex.empty())
   {
     if(!fAllowNew)
       return false;
@@ -2284,9 +2288,9 @@ bool LoadBlockIndex(bool fAllowNew)
     //   vMerkleTree: 4a5e1e
 
     // Genesis block
-    const char* pszTimestamp = "RT: Non-denying denial? RSA aims to distance itself from NSA scandal";
+    const char* pszTimestamp = "RT: http://rt.com/news/war-gear-ukraine-riot-084/";
     CTransaction txNew;
-    txNew.nTime = 1388098028;
+    txNew.nTime = 1390500425;
     txNew.vin.resize(1);
     txNew.vout.resize(1);
     txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(9999) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2297,106 +2301,69 @@ bool LoadBlockIndex(bool fAllowNew)
     block.hashPrevBlock = 0;
     block.hashMerkleRoot = block.BuildMerkleTree();
     block.nVersion = 1;
-    block.nTime    = !fTestNet ? 1345084287 : 1388098028;
+    block.nTime    = !fTestNet ? 1345084287 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 2179302059u : 865766467;
+    block.nNonce   = !fTestNet ? 2179302059u : 63533;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
     printf("hashGenesisBlock = %s\n", hashGenesisBlock.ToString().c_str());
     printf("block.hashMerkleRoot = %s\n", block.hashMerkleRoot.ToString().c_str());
 
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////// 
-
-    //I also included dcrypt.h up above, be sure of that
-    u32int hashes_done;
-    uint256 phash;
-    block.nNonce = 0;
-    // while(block.nNonce < 0xffff0000)
-    // {
-    //   //~ if(ScanDcryptHash(&block, &hashes_done) != (u32int)-1)
-    //     //~ break;
-
-    //   for(;;block.nNonce++)
-    //   {
-    //     //~ phash = sha256((const u8int*)&block, sizeof(CBlock));
-    //     phash = dcrypt((const u8int*)&block, sizeof(CBlock));
-    //     if(!uint256_get_top<u8int>(phash))
-    //     {
-    //       //~ printf("\nMagical number %llx\n", ((uint64*)&phash)[3]);
-    //       //~ printf("\nMagical number %llx\n", uint256_get_top<int64>(phash));
-    //       printf("Good hash %s\n", phash.ToString().c_str());
-    //       assert(false);
-    //     }
-    //   }
-
-    //   printf("Looped! nNonce is 0x%x\n", block.nNonce);
-    // }
-
-    // assert(false);
-
-    for(;;block.nNonce++)
-    {
-      if(ScanDcryptHash(&block, &hashes_done) != (u32int)-1)
-        break;
-
-      if(block.nNonce > 0xffff0000)
-      {
-        block.nTime++;
-        block.nNonce = 0;
-      }
-
-      printf("Looped! nNonce is 0x%x\n", block.nNonce);
-    }
-
-    phash = dcrypt(UBEGIN(block.nVersion), HASH_BLOCK_SIZE(block));
-
-    printf("\n\nGood Hash %s\n", phash.ToString().c_str());
-
-    printf("Good Block Get Hash %s, Nonce %d, block time %d\n\n", 
-           block.GetHash().ToString().c_str(), block.nNonce, block.nTime);
-
-    assert(false);
-
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////// 
-
-    assert(block.hashMerkleRoot == uint256("0x6561fdf42da044631a835cad31128929d8b95fde6ce3e4f89cff8d710d8af927"));
+    assert(block.hashMerkleRoot == uint256("0xaedeb3ea347476baf75f902017eafc470fe0129d2bb45636b3dc403842921e45"));
     block.print();
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+/**************************Scan for the Genesis Block**************************/
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////// 
 
     // If genesis block hash does not match, then generate new genesis hash
     if(false && block.GetHash() != hashGenesisBlock)
     {
-      uint256 hashTarget = CBigNum().SetCompact(block.nBits).getuint256();
-      printf("HashTarget = %s\n", hashTarget.ToString().c_str());
+      printf("\nScanning for the Genesis Block\n");
 
-      for(;;)
+      //I also included dcrypt.h up above, be sure of that
+      u32int hashes_done;
+      uint256 phash, hashTarget = CBigNum().SetCompact(block.nBits).getuint256();;
+
+      for(;;block.nNonce++)
       {
-        //print an update every 1000000 nonces
-        if(!(block.nNonce % 1000000) && block.nNonce)
-          printf("Tested nonces %d - %d, time %d\n", block.nNonce - 1000000, block.nNonce, block.nTime);
-
-        //check if we got a good hash
-        if(block.GetHash() < hashTarget)
-          break;
-
-        //no nonce found, increment the time, increment nNonce at the same time
-        if(!++block.nNonce)
+        //if scan does not return -1, then check if the hash is less than the target
+        if(ScanDcryptHash(&block, &hashes_done) != (u32int)-1)
+        {
+          printf("Hashes Done %d\n", hashes_done);
+          if(block.GetHash() < hashTarget)
+            break;
+        }
+        //if we have exhausted all nonces, increment the time and reset the nNonce
+        if(block.nNonce > 0xffff0000)
         {
           printf("NONCE WRAPPED, incrementing time\n");
-          ++block.nTime;        
+          block.nTime++;
+          block.nNonce = 0;
         }
+
+        printf("Looped! nNonce is 0x%x\n", block.nNonce);
       }
 
+      phash = dcrypt(UBEGIN(block.nVersion), HASH_BLOCK_SIZE(block));
+
+      printf("\n\nHash Target %s\n", hashTarget.ToString().c_str());
       printf("NEW block.nTime = %d\n", block.nTime);
       printf("NEW block.nNonce = %d\n", block.nNonce);
       printf("NEW block.GetHash = %s\n", block.GetHash().ToString().c_str());
+
+      //~ assert(false);
+
     }
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+/**************************Scan for the Genesis Block**************************/
+////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////// 
 
     assert(block.GetHash() == hashGenesisBlock);
     assert(block.CheckBlock());
@@ -3692,10 +3659,7 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone)
     // Return the nonce if the top 16 bits of the hash are all 0s,
     // caller will check if it has enough to reach the target
     if(!uint256_get_top<u16int>(phash))
-    {
-      printf("\n\nFound Hash %s, Nonce %d, block time %d\n\n", phash.ToString().c_str(), *nNonce, pblock->nTime);
-      return *nNonce;
-    }
+       return *nNonce;
 
     // If nothing found after trying for a while, return -1
     if(!(*nNonce & 0xffff))

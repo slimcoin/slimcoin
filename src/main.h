@@ -56,7 +56,7 @@ static const int fHaveUPnP = false;
 #endif
 
 static const uint256 hashGenesisBlockOfficial("0x0000000032fe677166d54963b62a4677d8957e87c508eaa4fd7eb1c880cd27e3");
-static const uint256 hashGenesisBlockTestNet("0x0000000a8ecef22cc3af763a952750f70c958e7812b4df332a13ea18aa478bb1");
+static const uint256 hashGenesisBlockTestNet("0x0000d4403af433075aa0ea949d2afd9b3adc530f6ce932a376c735c6892442c9");
 
 static const int64 nMaxClockDrift = 2 * 60 * 60;        // two hours
 
@@ -953,8 +953,6 @@ public:
 
   uint256 GetHash() const
   {
-    //~ printf("size %d, size %d\n", UEND(this->nNonce) - UBEGIN(this->nVersion), sizeof(UBEGIN(this->nVersion)[0]));
-    //~ return dcrypt(UBEGIN(this->nVersion), sizeof(CBlock));
     return Hash(BEGIN(nVersion), END(nNonce));
   }
 
