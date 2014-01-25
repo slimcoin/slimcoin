@@ -69,7 +69,7 @@ int64 nHPSTimerStart;
 int64 nTransactionFee = MIN_TX_FEE;
 
 // Dcrypt hash scanner
-static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone);
+static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash);
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -2319,6 +2319,9 @@ bool LoadBlockIndex(bool fAllowNew)
 ////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////// 
 
+    //There is a byte reveral thing in the miner for the
+    // hash and also the block's nonce, do not think that is needed but check
+
     // If genesis block hash does not match, then generate new genesis hash
     if(false && block.GetHash() != hashGenesisBlock)
     {
@@ -2331,12 +2334,13 @@ bool LoadBlockIndex(bool fAllowNew)
       for(;;block.nNonce++)
       {
         //if scan does not return -1, then check if the hash is less than the target
-        if(ScanDcryptHash(&block, &hashes_done) != (u32int)-1)
+        if(ScanDcryptHash(&block, &hashes_done, &phash) != (u32int)-1)
         {
-          printf("Hashes Done %d\n", hashes_done);
-          if(block.GetHash() < hashTarget)
+          printf("Hashes Done so far %d\n", hashes_done);
+          if(phash < hashTarget)
             break;
         }
+
         //if we have exhausted all nonces, increment the time and reset the nNonce
         if(block.nNonce > 0xffff0000)
         {
@@ -2347,8 +2351,6 @@ bool LoadBlockIndex(bool fAllowNew)
 
         printf("Looped! nNonce is 0x%x\n", block.nNonce);
       }
-
-      phash = dcrypt(UBEGIN(block.nVersion), HASH_BLOCK_SIZE(block));
 
       printf("\n\nHash Target %s\n", hashTarget.ToString().c_str());
       printf("NEW block.nTime = %d\n", block.nTime);
@@ -3644,22 +3646,28 @@ unsigned int static ScanHash_CryptoPP(char* pmidstate, char* pdata, char* phash1
 // between calls, but periodically or if nNonce is 0xffff0000 or above,
 // the block is rebuilt and nNonce starts over at zero.
 //
-static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone)
+static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash)
 {
-  u32int *nNonce = &pblock->nNonce;
+  u32int *nNonce = &(pblock->nNonce);
+  u32int orig_nNonce = *nNonce;
   static uint8_t digest[DCRYPT_DIGEST_LENGTH];
-  uint256 phash;
 
   for(;;)
   {
+
     //hash the block
     (*nNonce)++;
-    phash = dcrypt(UBEGIN(pblock->nVersion), HASH_PBLOCK_SIZE(pblock), digest);
+
+    *phash = dcrypt(UBEGIN(pblock->nVersion), HASH_PBLOCK_SIZE(pblock), digest);
 
     // Return the nonce if the top 16 bits of the hash are all 0s,
     // caller will check if it has enough to reach the target
-    if(!uint256_get_top<u16int>(phash))
-       return *nNonce;
+    if(!uint256_get_top<u16int>(*phash))
+    {
+      //increment the hash counter accordingly
+      *nHashesDone += (*nNonce - orig_nNonce);
+      return *nNonce;
+    }
 
     // If nothing found after trying for a while, return -1
     if(!(*nNonce & 0xffff))
@@ -3668,6 +3676,8 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone)
       return (unsigned int) -1;
     }
   }
+
+  return (u32int)-1;
 }
 
 // Some explaining would be appreciated
@@ -4072,12 +4082,14 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
           strMintWarning = strMintMessage;
           continue;
         }
+
         strMintWarning = "";
         printf("CPUMiner : proof-of-stake block found %s\n", pblock->GetHash().ToString().c_str()); 
         SetThreadPriority(THREAD_PRIORITY_NORMAL);
         CheckWork(pblock.get(), *pwalletMain, reservekey);
         SetThreadPriority(THREAD_PRIORITY_LOWEST);
       }
+
       Sleep(500);
       continue;
     }
@@ -4103,29 +4115,25 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
     //
     int64 nStart = GetTime();
     uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-    uint256 hashbuf[2];
-    uint256& hash = *alignup<16>(hashbuf);
+    uint256 test_hash;
 
     for(;;)
     {
       unsigned int nHashesDone = 0;
       unsigned int nNonceFound;
 
-      // Crypto++ SHA-256
-      nNonceFound = ScanHash_CryptoPP(pmidstate, pdata + 64, phash1,
-                                      (char*)&hash, nHashesDone);
+      nNonceFound = ScanDcryptHash(pblock.get(), &nHashesDone, &test_hash);
 
       // Check if something found
       if(nNonceFound != (unsigned int) -1)
       {
-        for(unsigned int i = 0; i < sizeof(hash) / 4; i++)
-          ((unsigned int*)&hash)[i] = ByteReverse(((unsigned int*)&hash)[i]);
 
-        if(hash <= hashTarget)
+        printf("Possible block %s\n", test_hash.ToString().c_str());
+
+        if(test_hash <= hashTarget)
         {
           // Found a solution!
-          pblock->nNonce = ByteReverse(nNonceFound);
-          assert(hash == pblock->GetHash());
+          assert(test_hash == pblock->GetHash());
 
           if(!pblock->SignBlock(*pwalletMain))
           {
@@ -4157,6 +4165,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
           LOCK(cs);
           if(GetTimeMillis() - nHPSTimerStart > 4000)
           {
+            //times 1000 to get to seconds
             dHashesPerSec = 1000.0 * nHashCounter / (GetTimeMillis() - nHPSTimerStart);
             nHPSTimerStart = GetTimeMillis();
             nHashCounter = 0;
@@ -4165,7 +4174,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
             {
               nLogTime = GetTime();
               printf("%s ", DateTimeStrFormat(GetTime()).c_str());
-              printf("hashmeter %3d CPUs %6.0f khash/s\n", vnThreadsRunning[THREAD_MINER], dHashesPerSec/1000.0);
+              printf("hashmeter %3d CPUs %6.0f hash/s\n", vnThreadsRunning[THREAD_MINER], dHashesPerSec);
             }
           }
         }
@@ -4240,6 +4249,7 @@ void GenerateSlimcoins(bool fGenerate, CWallet* pwallet)
     int nProcessors = boost::thread::hardware_concurrency();
     printf("%d processors\n", nProcessors);
 
+    //there must be atleast one CPU core
     if(nProcessors < 1)
       nProcessors = 1;
 

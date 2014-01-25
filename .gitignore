@@ -10,7 +10,7 @@ src/build.h
 *.orig
 *.o
 *.patch
-.bitcoin
+.slimcoin
 
 my*
 .my*
@@ -23,7 +23,7 @@ TAGS
 #compilation and Qt preprocessor part
 *.qm
 Makefile
-bitcoin-qt
+slimcoin-qt
 
 #resources cpp
 qrc_*.cpp

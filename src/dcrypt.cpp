@@ -15,6 +15,22 @@
 
 uint8_t dcrypt_hashdigest[SHA256_DIGEST_LENGTH];
 
+class Extend_Array
+{
+public:
+  Extend_Array()
+  {
+    //initial values
+    array = 0;
+    actual_array_sz = 0;
+    times_realloced = 0;
+  }
+
+  uint8_t *array;
+  unsigned long long actual_array_sz;
+  uint32_t times_realloced;
+};
+
 uint32_t hex_char_to_int(uint8_t c)
 {
   if(c >= '0' && c <= '9')
@@ -35,41 +51,42 @@ inline void join_to_array(uint8_t *array, uint8_t join)
   return;
 }
 
-void extend_array(uint8_t **array, unsigned long long used_array_sz, 
+void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz, 
                   uint8_t *extend, uint32_t extend_sz, uint8_t hashed_end)
 {
-  if(!array)
+  if(!extend_array)
     return;
 
-  static unsigned long long actual_array_sz = 0;
-  static uint32_t times_realloced = 0;
+  //make a few references
+  unsigned long long &actual_array_sz = extend_array->actual_array_sz;
+  uint32_t &times_realloced = extend_array->times_realloced;
 
   //if there is not enough room
   if((actual_array_sz - used_array_sz) < (extend_sz + hashed_end))
   {
-    //if *array has already been malloc'd
+    //if extend_array->array has already been malloc'd
     if(times_realloced)
     {
       printf("IP\n");
       //reallocate on an exponential curve, modern computers have plenty ram
       actual_array_sz += pow(2, times_realloced++) * REALLOC_BASE_SZ;
-      *array = (uint8_t*)realloc(*array, actual_array_sz);
+      extend_array->array = (uint8_t*)realloc(extend_array->array, actual_array_sz);
     }else
     {
       //allocate the base size
       actual_array_sz += REALLOC_BASE_SZ;
       times_realloced++;
 
-      *array = (uint8_t*)malloc(actual_array_sz); //if we have not allocated anything, malloc
+      extend_array->array = (uint8_t*)malloc(actual_array_sz); //if we have not allocated anything, malloc
     }
   }
 
   //copy the data to be extended
-  memcpy(*array + used_array_sz, extend, extend_sz);
+  memcpy(extend_array->array + used_array_sz, extend, extend_sz);
 
   if(hashed_end)
   {
-    *(*array + used_array_sz + extend_sz) = 0; //add the final \000 of the whole string array
+    *(extend_array->array + used_array_sz + extend_sz) = 0; //add the final \000 of the whole string array
 
     //reset the static variables
     actual_array_sz = times_realloced = 0;
@@ -169,7 +186,10 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
   uint8_t hashed_end = false;
   uint32_t i, index = 0, hashed_nums_len = n_str * SHA256_LEN;
   uint64 count;
-  uint8_t tmp_val, tmp_array[SHA256_LEN + 2], *new_hash = 0;
+  uint8_t tmp_val, tmp_array[SHA256_LEN + 2];
+
+  //initialize the class for the extend hash
+  Extend_Array new_hash;
 
   //set the first hash length in the temp array to all 0xff
   memset(tmp_array, 0xff, SHA256_LEN);
@@ -221,7 +241,8 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
 
   }
 
-  *mixed_hash = new_hash;
+  //assign the address of new_hash's array to mixed_hash
+  *mixed_hash = new_hash.array;
 
 //these were not created if EXPAND_HASH_TIME == 0
 #if EXPAND_HASH_TIMES
