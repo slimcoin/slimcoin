@@ -2299,7 +2299,7 @@ bool LoadBlockIndex(bool fAllowNew)
     block.nVersion = 1;
     block.nTime    = !fTestNet ? 1345084287 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 2179302059u : 63533;
+    block.nNonce   = !fTestNet ? 2179302059u : 66166;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
@@ -4093,6 +4093,9 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
 
         if(test_hash <= hashTarget)
         {
+          printf("Thash %s\nPblock->GetHash %s\n", 
+                 test_hash.ToString().c_str(), pblock->GetHash().ToString().c_str());
+
           // Found a solution!
           assert(test_hash == pblock->GetHash());
 
