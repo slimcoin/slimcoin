@@ -2245,10 +2245,10 @@ bool LoadBlockIndex(bool fAllowNew)
   if(fTestNet)
   {
     hashGenesisBlock = hashGenesisBlockTestNet;
-    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 12); //3 preceding 0s, 12/4 since every hex = 4 bits
+    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
     nStakeMinAge = 60 * 60 * 24; // test net min age is 1 day
     nCoinbaseMaturity = 60;
-    bnInitialHashTarget = CBigNum(~uint256(0) >> 13); //0x0007ffff.....
+    bnInitialHashTarget = CBigNum(~uint256(0) >> 17); //0x00007ffff.....
     nModifierInterval = 60 * 20; // test net modifier interval is 20 minutes
   }
 
@@ -2299,7 +2299,7 @@ bool LoadBlockIndex(bool fAllowNew)
     block.nVersion = 1;
     block.nTime    = !fTestNet ? 1345084287 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 2179302059u : 66166;
+    block.nNonce   = !fTestNet ? 2179302059u : 63533;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
@@ -3611,7 +3611,7 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
 {
   u32int *nNonce = &(pblock->nNonce);
   u32int orig_nNonce = *nNonce;
-  static uint8_t digest[DCRYPT_DIGEST_LENGTH];
+  uint8_t digest[DCRYPT_DIGEST_LENGTH];
 
   for(;;)
   {

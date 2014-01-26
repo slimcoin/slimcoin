@@ -615,9 +615,6 @@ inline uint256 Hash(const T1 pbegin, const T1 pend)
   static unsigned char pblank[1];
   uint256 hash;
 
-  //~ printf("Hashing address 0x%x, size %d size %d\n", (pbegin == pend ? pblank : (unsigned char*)&pbegin[0]),
-         //~ (pend - pbegin) * sizeof(pbegin[0]), sizeof(pbegin[0]));
-
   hash = dcrypt((pbegin == pend ? pblank : (unsigned char*)&pbegin[0]),
                 (pend - pbegin) * sizeof(pbegin[0]));
 
@@ -704,7 +701,8 @@ inline uint160 Hash160(const std::vector<unsigned char>& vch)
 {
   uint256 hash1;
   //the address of the first element is the start of the array
-  hash1 = dcrypt(&vch[0], vch.size());
+  //~ hash1 = dcrypt(&vch[0], vch.size());
+  SHA256(&vch[0], vch.size(), (unsigned char*)&hash1);
   uint160 hash2;
   RIPEMD160((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
   return hash2;

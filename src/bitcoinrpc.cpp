@@ -351,7 +351,7 @@ Value gethashespersec(const Array& params, bool fHelp)
 // slimcoin: get network Gh/s estimate
 Value getnetworkghps(const Array& params, bool fHelp)
 {
-    if(fHelp || params.size() != 0)
+    if(fHelp || params.size())
         throw runtime_error(
             "getnetworkghps\n"
             "Returns a recent Ghash/second network mining estimate.");
@@ -361,11 +361,13 @@ Value getnetworkghps(const Array& params, bool fHelp)
     int64 nInterval = 72;
     CBlockIndex* pindex = pindexGenesisBlock;
     CBlockIndex* pindexPrevWork = pindexGenesisBlock;
+
     while(pindex)
     {
         // Exponential moving average of recent proof-of-work block spacing
         if(pindex->IsProofOfWork())
         {
+          //obtain the time between the blocks
             int64 nActualSpacingWork = pindex->GetBlockTime() - pindexPrevWork->GetBlockTime();
             nTargetSpacingWork = ((nInterval - 1) * nTargetSpacingWork + nActualSpacingWork + nActualSpacingWork) / (nInterval + 1);
             nTargetSpacingWork = max(nTargetSpacingWork, nTargetSpacingWorkMin);

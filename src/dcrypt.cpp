@@ -13,8 +13,6 @@
 //the base size for realloc will be 1MB
 #define REALLOC_BASE_SZ   (1024 * 1024)
 
-uint8_t dcrypt_hashdigest[SHA256_DIGEST_LENGTH];
-
 class Extend_Array
 {
 public:
@@ -258,6 +256,12 @@ uint256 dcrypt(char **str_nums, uint32_t n_str, char *out_hash, uint8_t *hash_di
   uint8_t *hashed_nums, *mix_hash;
   uint256 hash;
 
+  if(!hash_digest)
+  {
+    uint8_t hdig[DCRYPT_DIGEST_LENGTH];
+    hash_digest = hdig;
+  }
+
   //append the hashes
   hashed_nums = hash_append(str_nums, n_str, hash_digest);
 
@@ -278,6 +282,12 @@ uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
 {
   uint8_t hashed_nums[SHA256_LEN + 1], *mix_hash;
   uint256 hash;
+
+  if(!hash_digest)
+  {
+    uint8_t hdig[DCRYPT_DIGEST_LENGTH];
+    hash_digest = hdig;
+  }
 
   sha256_to_str(data, data_sz, hashed_nums, hash_digest);
 
