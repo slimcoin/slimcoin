@@ -462,6 +462,7 @@ bool CTransaction::CheckTransaction() const
   for(int i = 0; i < vout.size(); i++)
   {
     const CTxOut& txout = vout[i];
+
     if(txout.IsEmpty() && (!IsCoinBase()) && (!IsCoinStake()))
       return DoS(100, error("CTransaction::CheckTransaction() : txout empty for user transaction"));
     // slimcoin: enforce minimum output amount
@@ -842,41 +843,36 @@ int64 GetProofOfWorkReward(unsigned int nBits)
 
   int64 nSubsidy = 0;
 
-  //resume the regular algorithm if the difficulty is greater than 1250
-  if(bnDiff > 1250)
+  // slimcoin: subsidy is cut in half every 16x multiply of difficulty
+  // A reasonably continuous curve is used to avoid shock to market
+  // (nSubsidyLimit / nSubsidy) ** 4 == bnProofOfWorkLimit / bnTarget
+  //
+  // Human readable form:
+  //
+  // difficulty = bnTargetLimit / bnTarget
+  //
+  // Subsidy = (the max mint reward) / (the forth root of the difficulty)
+  // nSubsidy = bnSubsidyLimit / (difficulty ^ 1/4)
+
+  CBigNum bnLowerBound = CENT;
+  CBigNum bnUpperBound = bnSubsidyLimit;
+
+  while(bnLowerBound + CENT <= bnUpperBound)
   {
-    // slimcoin: subsidy is cut in half every 16x multiply of difficulty
-    // A reasonably continuous curve is used to avoid shock to market
-    // (nSubsidyLimit / nSubsidy) ** 4 == bnProofOfWorkLimit / bnTarget
-    //
-    // Human readable form:
-    //
-    // bnTargetLimit / bnTarget = difficulty
-    //
-    // nSubsidy = bnSubsidyLimit / (difficulty ^ 1/4)
+    CBigNum bnMidValue = (bnLowerBound + bnUpperBound) / 2;
+    if(fDebug && GetBoolArg("-printcreation"))
+      printf("GetProofOfWorkReward() : lower = %"PRI64d", upper = %"PRI64d", mid = %"PRI64d"\n",
+             bnLowerBound.getuint64(), bnUpperBound.getuint64(), bnMidValue.getuint64());
 
-    CBigNum bnLowerBound = CENT;
-    CBigNum bnUpperBound = bnSubsidyLimit;
-
-    while(bnLowerBound + CENT <= bnUpperBound)
+    if(bnMidValue * bnMidValue * bnMidValue * bnMidValue * bnTargetLimit > 
+       bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnTarget)
     {
-      CBigNum bnMidValue = (bnLowerBound + bnUpperBound) / 2;
-      if(fDebug && GetBoolArg("-printcreation"))
-        printf("GetProofOfWorkReward() : lower = %"PRI64d", upper = %"PRI64d", mid = %"PRI64d"\n",
-               bnLowerBound.getuint64(), bnUpperBound.getuint64(), bnMidValue.getuint64());
+      bnUpperBound = bnMidValue;
+    }else
+      bnLowerBound = bnMidValue;
+  }
 
-      if(bnMidValue * bnMidValue * bnMidValue * bnMidValue * bnTargetLimit > 
-         bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnSubsidyLimit * bnTarget)
-      {
-        bnUpperBound = bnMidValue;
-      }else
-        bnLowerBound = bnMidValue;
-    }
-
-    nSubsidy = bnUpperBound.getuint64();
-
-  }else
-    nSubsidy = 1.333333 * bnDiff.getuint64(); //to prevent massive block rewards durring low difficulty
+  nSubsidy = bnUpperBound.getuint64();
 
   nSubsidy = (nSubsidy / CENT) * CENT;
 
@@ -2249,10 +2245,10 @@ bool LoadBlockIndex(bool fAllowNew)
   if(fTestNet)
   {
     hashGenesisBlock = hashGenesisBlockTestNet;
-    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
+    bnProofOfWorkLimit = CBigNum(~uint256(0) >> 12); //3 preceding 0s, 12/4 since every hex = 4 bits
     nStakeMinAge = 60 * 60 * 24; // test net min age is 1 day
     nCoinbaseMaturity = 60;
-    bnInitialHashTarget = CBigNum(~uint256(0) >> 17); //0x00007ffff.....
+    bnInitialHashTarget = CBigNum(~uint256(0) >> 13); //0x0007ffff.....
     nModifierInterval = 60 * 20; // test net modifier interval is 20 minutes
   }
 
@@ -3564,7 +3560,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
 
 //////////////////////////////////////////////////////////////////////////////
 //
-// BitcoinMiner
+// SlimCoinMiner
 //
 
 int static FormatHashBlocks(void* pbuffer, unsigned int len)
@@ -3606,44 +3602,9 @@ void SHA256Transform(void* pstate, void* pinput, const void* pinit)
 }
 
 //
-// ScanHash scans nonces looking for a hash with at least some zero bits.
-// It operates on big endian data.  Caller does the byte reversing.
-// All input buffers are 16-byte aligned.  nNonce is usually preserved
-// between calls, but periodically or if nNonce is 0xffff0000 or above,
-// the block is rebuilt and nNonce starts over at zero.
-//
-unsigned int static ScanHash_CryptoPP(char* pmidstate, char* pdata, char* phash1,
-                                      char* phash, unsigned int& nHashesDone)
-{
-  unsigned int& nNonce = *(unsigned int*)(pdata + 12);
-  for(;;)
-  {
-    // Crypto++ SHA-256
-    // Hash pdata using pmidstate as the starting state into
-    // preformatted buffer phash1, then hash phash1 into phash
-    nNonce++;
-    SHA256Transform(phash1, pdata, pmidstate);
-    SHA256Transform(phash, phash1, pSHA256InitState);
-
-    // Return the nonce if the hash has at least some zero bits,
-    // caller will check if it has enough to reach the target
-    if(((unsigned short*)phash)[14] == 0)
-      return nNonce;
-
-    // If nothing found after trying for a while, return -1
-    if((nNonce & 0xffff) == 0)
-    {
-      nHashesDone = 0xffff+1;
-      return (unsigned int) -1;
-    }
-  }
-}
-
-//
 // ScanDcryptHash scans nonces looking for a hash with at least some zero bits.
 // It operates on big endian data.  Caller does the byte reversing.
-// All input buffers are 16-byte aligned.  nNonce is usually preserved
-// between calls, but periodically or if nNonce is 0xffff0000 or above,
+// nNonce is usually preserved between calls, but periodically or if nNonce is 0xffff0000 or above,
 // the block is rebuilt and nNonce starts over at zero.
 //
 static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash)
@@ -3660,9 +3621,9 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
 
     *phash = dcrypt(UBEGIN(pblock->nVersion), HASH_PBLOCK_SIZE(pblock), digest);
 
-    // Return the nonce if the top 16 bits of the hash are all 0s,
-    // caller will check if it has enough to reach the target
-    if(!uint256_get_top<u16int>(*phash))
+    // Return the nonce if the top 8 bits of the hash are all 0s,
+    // caller will check if it satisfies the target
+    if(!uint256_get_top<u8int>(*phash))
     {
       //increment the hash counter accordingly
       *nHashesDone += (*nNonce - orig_nNonce);
@@ -3993,10 +3954,10 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
   uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
   if(hash > hashTarget && pblock->IsProofOfWork())
-    return error("BitcoinMiner : proof-of-work not meeting target");
+    return error("SlimCoinMiner : proof-of-work not meeting target");
 
   //// debug print
-  printf("BitcoinMiner:\n");
+  printf("SlimCoinMiner:\n");
   printf("new block found  \n  hash: %s  \ntarget: %s\n", hash.GetHex().c_str(), hashTarget.GetHex().c_str());
   pblock->print();
   printf("%s ", DateTimeStrFormat(GetTime()).c_str());
@@ -4006,7 +3967,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
   {
     LOCK(cs_main);
     if(pblock->hashPrevBlock != hashBestChain)
-      return error("BitcoinMiner : generated block is stale");
+      return error("SlimCoinMiner : generated block is stale");
 
     // Remove key from key pool
     reservekey.KeepKey();
@@ -4019,7 +3980,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 
     // Process this block the same as if we had received it from another node
     if(!ProcessBlock(NULL, pblock))
-      return error("BitcoinMiner : ProcessBlock, block not accepted");
+      return error("SlimCoinMiner : ProcessBlock, block not accepted");
   }
 
   return true;
@@ -4031,7 +3992,7 @@ static bool fGenerateSlimcoins = false;
 static bool fLimitProcessors = false;
 static int nLimitProcessors = -1;
 
-void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
+void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
 {
   printf("CPUMiner started for proof-of-%s\n", fProofOfStake? "stake" : "work");
   SetThreadPriority(THREAD_PRIORITY_LOWEST);
@@ -4094,7 +4055,7 @@ void BitcoinMiner(CWallet *pwallet, bool fProofOfStake)
       continue;
     }
 
-    printf("Running BitcoinMiner with %d transactions in block\n", pblock->vtx.size());
+    printf("Running SlimCoinMiner with %d transactions in block\n", pblock->vtx.size());
 
 
     //
@@ -4214,7 +4175,7 @@ void static ThreadSlimcoinMiner(void* parg)
   try
   {
     vnThreadsRunning[THREAD_MINER]++;
-    BitcoinMiner(pwallet, false);
+    SlimCoinMiner(pwallet, false);
     vnThreadsRunning[THREAD_MINER]--;
   }catch(std::exception& e)
   {
@@ -4257,7 +4218,7 @@ void GenerateSlimcoins(bool fGenerate, CWallet* pwallet)
       nProcessors = nLimitProcessors;
 
     int nAddThreads = nProcessors - vnThreadsRunning[THREAD_MINER];
-    printf("Starting %d BitcoinMiner threads\n", nAddThreads);
+    printf("Starting %d SlimCoinMiner threads\n", nAddThreads);
 
     for(int i = 0; i < nAddThreads; i++)
     {
