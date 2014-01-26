@@ -12,6 +12,7 @@ src/build.h
 *.patch
 .slimcoin
 
+#testing scripts
 my*
 .my*
 \#*\#
@@ -24,6 +25,7 @@ TAGS
 *.qm
 Makefile
 slimcoin-qt
+slimcoind
 
 #resources cpp
 qrc_*.cpp
