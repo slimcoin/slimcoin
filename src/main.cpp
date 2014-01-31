@@ -4005,6 +4005,7 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
   {
     if(fShutdown)
       return;
+
     while(vNodes.empty() || IsInitialBlockDownload())
     {
       Sleep(1000);
@@ -4089,12 +4090,12 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
       if(nNonceFound != (unsigned int) -1)
       {
 
-        printf("Possible block %s\n", test_hash.ToString().c_str());
+        //~ printf("Possible block %s\n", test_hash.ToString().c_str());
 
         if(test_hash <= hashTarget)
         {
-          printf("Thash %s\nPblock->GetHash %s\n", 
-                 test_hash.ToString().c_str(), pblock->GetHash().ToString().c_str());
+          //~ printf("Thash %s\nPblock->GetHash %s\n", 
+                 //~ test_hash.ToString().c_str(), pblock->GetHash().ToString().c_str());
 
           // Found a solution!
           assert(test_hash == pblock->GetHash());
@@ -4134,7 +4135,9 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
             nHPSTimerStart = GetTimeMillis();
             nHashCounter = 0;
             static int64 nLogTime;
-            if(GetTime() - nLogTime > 30 * 60)
+
+            //update with hashing speed information 30 secs
+            if(GetTime() - nLogTime > 30)
             {
               nLogTime = GetTime();
               printf("%s ", DateTimeStrFormat(GetTime()).c_str());

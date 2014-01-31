@@ -1,7 +1,7 @@
 src/*.exe
-src/bitcoin
-src/bitcoind
-src/test_bitcoin
+src/slimcoin
+src/slimcoind
+src/test_slimcoin
 src/build.h
 .*.swp
 *.*~*
@@ -14,7 +14,7 @@ src/build.h
 
 #testing scripts
 my*
-.my*
+my*
 \#*\#
 .\#*
 *emacs*
@@ -24,8 +24,6 @@ TAGS
 #compilation and Qt preprocessor part
 *.qm
 Makefile
-slimcoin-qt
-slimcoind
 
 #resources cpp
 qrc_*.cpp
