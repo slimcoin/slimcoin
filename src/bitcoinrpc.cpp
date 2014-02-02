@@ -802,7 +802,8 @@ int64 GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMinD
   int64 nBalance = 0;
 
   // Tally wallet transactions
-  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
+  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin();
+      it != pwalletMain->mapWallet.end(); ++it)
   {
     const CWalletTx& wtx = (*it).second;
     if(!wtx.IsFinal())
@@ -811,7 +812,7 @@ int64 GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMinD
     int64 nGenerated, nReceived, nSent, nFee;
     wtx.GetAccountAmounts(strAccount, nGenerated, nReceived, nSent, nFee);
 
-    if(nReceived != 0 && wtx.GetDepthInMainChain() >= nMinDepth)
+    if(nReceived && wtx.GetDepthInMainChain() >= nMinDepth)
       nBalance += nReceived;
     nBalance += nGenerated - nSent - nFee;
   }
@@ -837,19 +838,21 @@ Value getbalance(const Array& params, bool fHelp)
       "If [account] is not specified, returns the server's total available balance.\n"
       "If [account] is specified, returns the balance in the account.");
 
-  if(params.size() == 0)
-    return  ValueFromAmount(pwalletMain->GetBalance());
+  if(!params.size())
+    return ValueFromAmount(pwalletMain->GetBalance());
 
   int nMinDepth = 1;
   if(params.size() > 1)
     nMinDepth = params[1].get_int();
 
-  if(params[0].get_str() == "*") {
+  if(params[0].get_str() == "*") 
+  {
     // Calculate total balance a different way from GetBalance()
     // (GetBalance() sums up all unspent TxOuts)
     // getbalance and getbalance '*' should always return the same number.
     int64 nBalance = 0;
-    for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
+    for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); 
+        it != pwalletMain->mapWallet.end(); ++it)
     {
       const CWalletTx& wtx = (*it).second;
       if(!wtx.IsFinal())
@@ -944,17 +947,21 @@ Value sendfrom(const Array& params, bool fHelp)
 
   string strAccount = AccountFromValue(params[0]);
   CBitcoinAddress address(params[1].get_str());
+
   if(!address.IsValid())
     throw JSONRPCError(-5, "Invalid slimcoin address");
+
   int64 nAmount = AmountFromValue(params[2]);
   if(nAmount < MIN_TXOUT_AMOUNT)
     throw JSONRPCError(-101, "Send amount too small");
+
   int nMinDepth = 1;
   if(params.size() > 3)
     nMinDepth = params[3].get_int();
 
   CWalletTx wtx;
   wtx.strFromAccount = strAccount;
+
   if(params.size() > 4 && params[4].type() != null_type && !params[4].get_str().empty())
     wtx.mapValue["comment"] = params[4].get_str();
   if(params.size() > 5 && params[5].type() != null_type && !params[5].get_str().empty())

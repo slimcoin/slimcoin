@@ -1732,6 +1732,7 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
     CTxIndex txindex;
     if(!txPrev.ReadFromDisk(txdb, txin.prevout, txindex))
       continue;  // previous transaction not in main chain
+
     if(nTime < txPrev.nTime)
       return false;  // Transaction timestamp violation
 
@@ -1739,19 +1740,22 @@ bool CTransaction::GetCoinAge(CTxDB& txdb, uint64& nCoinAge) const
     CBlock block;
     if(!block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
       return false; // unable to read block of previous transaction
+
     if(block.GetBlockTime() + nStakeMinAge > nTime)
       continue; // only count coins meeting min age requirement
 
     int64 nValueIn = txPrev.vout[txin.prevout.n].nValue;
-    bnCentSecond += CBigNum(nValueIn) * (nTime-txPrev.nTime) / CENT;
+    bnCentSecond += CBigNum(nValueIn) * (nTime - txPrev.nTime) / CENT;
 
     if(fDebug && GetBoolArg("-printcoinage"))
-      printf("coin age nValueIn=%-12I64d nTimeDiff=%d bnCentSecond=%s\n", nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
+      printf("coin age nValueIn=%-12I64d nTimeDiff=%d bnCentSecond=%s\n",
+             nValueIn, nTime - txPrev.nTime, bnCentSecond.ToString().c_str());
   }
 
   CBigNum bnCoinDay = bnCentSecond * CENT / COIN / (24 * 60 * 60);
   if(fDebug && GetBoolArg("-printcoinage"))
     printf("coin age bnCoinDay=%s\n", bnCoinDay.ToString().c_str());
+
   nCoinAge = bnCoinDay.getuint64();
   return true;
 }
@@ -1771,10 +1775,12 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
       return false;
   }
 
-  if(nCoinAge == 0) // block coin age minimum 1 coin-day
+  if(!nCoinAge) // block coin age minimum 1 coin-day
     nCoinAge = 1;
+
   if(fDebug && GetBoolArg("-printcoinage"))
     printf("block coin age total nCoinDays=%"PRI64d"\n", nCoinAge);
+
   return true;
 }
 
@@ -2015,16 +2021,22 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
 {
   // Check for duplicate
   uint256 hash = pblock->GetHash();
+
   if(mapBlockIndex.count(hash))
-    return error("ProcessBlock() : already have block %d %s", mapBlockIndex[hash]->nHeight, hash.ToString().substr(0,20).c_str());
+    return error("ProcessBlock() : already have block %d %s", 
+                 mapBlockIndex[hash]->nHeight, hash.ToString().substr(0,20).c_str());
+
   if(mapOrphanBlocks.count(hash))
     return error("ProcessBlock() : already have block (orphan) %s", hash.ToString().substr(0,20).c_str());
 
   // slimcoin: check proof-of-stake
   // Limited duplicity on stake: prevents block flood attack
   // Duplicate stake allowed only when there is orphan child block
-  if(pblock->IsProofOfStake() && setStakeSeen.count(pblock->GetProofOfStake()) && !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-    return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for block %s", pblock->GetProofOfStake().first.ToString().c_str(), pblock->GetProofOfStake().second, hash.ToString().c_str());
+  if(pblock->IsProofOfStake() && setStakeSeen.count(pblock->GetProofOfStake()) && 
+     !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
+    return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for block %s", 
+                 pblock->GetProofOfStake().first.ToString().c_str(), 
+                 pblock->GetProofOfStake().second, hash.ToString().c_str());
 
   // Preliminary checks
   if(!pblock->CheckBlock())
@@ -2039,6 +2051,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
       printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", hash.ToString().c_str());
       return false; // do not error here as we expect this during initial block download
     }
+
     if(!mapProofOfStake.count(hash)) // add to mapProofOfStake
       mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
   }
@@ -2057,7 +2070,8 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     {
       if(pfrom)
         pfrom->Misbehaving(100);
-      return error("ProcessBlock() : block with too little %s", pblock->IsProofOfStake()? "proof-of-stake" : "proof-of-work");
+      return error("ProcessBlock() : block with too little %s", 
+                   pblock->IsProofOfStake() ? "proof-of-stake" : "proof-of-work");
     }
   }
 
@@ -2070,14 +2084,19 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
   {
     printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
     CBlock* pblock2 = new CBlock(*pblock);
+
     // slimcoin: check proof-of-stake
     if(pblock2->IsProofOfStake())
     {
       // Limited duplicity on stake: prevents block flood attack
       // Duplicate stake allowed only when there is orphan child block
-      if(setStakeSeenOrphan.count(pblock2->GetProofOfStake()) && !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-        return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for orphan block %s", pblock2->GetProofOfStake().first.ToString().c_str(), pblock2->GetProofOfStake().second, hash.ToString().c_str());
-      else
+      if(setStakeSeenOrphan.count(pblock2->GetProofOfStake()) && !mapOrphanBlocksByPrev.count(hash) && 
+         !Checkpoints::WantedByPendingSyncCheckpoint(hash))
+      {
+        return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for orphan block %s", 
+                     pblock2->GetProofOfStake().first.ToString().c_str(), 
+                     pblock2->GetProofOfStake().second, hash.ToString().c_str());
+      }else
         setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
     }
     mapOrphanBlocks.insert(make_pair(hash, pblock2));
@@ -3700,10 +3719,11 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     int64 nSearchTime = txCoinStake.nTime; // search to current time
     if(nSearchTime > nLastCoinStakeSearchTime)
     {
-      if(pwallet->CreateCoinStake(*pwallet, pblock->nBits, nSearchTime-nLastCoinStakeSearchTime, txCoinStake))
+      if(pwallet->CreateCoinStake(*pwallet, pblock->nBits, nSearchTime - nLastCoinStakeSearchTime, txCoinStake))
       {
         if(txCoinStake.nTime >= max(pindexPrev->GetMedianTimePast()+1, pindexPrev->GetBlockTime() - nMaxClockDrift))
-        {   // make sure coinstake would meet timestamp protocol
+        {   
+          // make sure coinstake would meet timestamp protocol
           // as it would be the same as the block timestamp
           pblock->vtx[0].vout[0].SetEmpty();
           pblock->vtx[0].nTime = txCoinStake.nTime;
@@ -3994,7 +4014,7 @@ static int nLimitProcessors = -1;
 
 void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
 {
-  printf("CPUMiner started for proof-of-%s\n", fProofOfStake? "stake" : "work");
+  printf("CPUMiner started for proof-of-%s\n", fProofOfStake ? "stake" : "work");
   SetThreadPriority(THREAD_PRIORITY_LOWEST);
 
   // Each thread has its own key and counter
