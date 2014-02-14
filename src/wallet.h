@@ -150,12 +150,15 @@ public:
   int64 GetUnconfirmedBalance() const;
   int64 GetStake() const;
   int64 GetNewMint() const;
-  bool CreateTransaction(const std::vector<std::pair<CScript, int64> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64& nFeeRet);
-  bool CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew, CReserveKey& reservekey, int64& nFeeRet);
+  bool CreateTransaction(const std::vector<std::pair<CScript, int64> >& vecSend, CWalletTx& wtxNew, 
+                         CReserveKey& reservekey, int64& nFeeRet);
+  bool CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew,
+                         CReserveKey& reservekey, int64& nFeeRet);
   bool CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int64 nSearchInterval, CTransaction& txNew);
   bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
   std::string SendMoney(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew, bool fAskFee=false);
-  std::string SendMoneyToBitcoinAddress(const CBitcoinAddress& address, int64 nValue, CWalletTx& wtxNew, bool fAskFee=false);
+  std::string SendMoneyToBitcoinAddress(const CBitcoinAddress& address, int64 nValue,
+                                        CWalletTx& wtxNew, bool fAskFee=false);
 
   bool NewKeyPool();
   bool TopUpKeyPool();
@@ -175,7 +178,7 @@ public:
   }
   int64 GetCredit(const CTxOut& txout) const
   {
-    if (!MoneyRange(txout.nValue))
+    if(!MoneyRange(txout.nValue))
       throw std::runtime_error("CWallet::GetCredit() : value out of range");
     return (IsMine(txout) ? txout.nValue : 0);
   }
@@ -517,20 +520,20 @@ CWalletTx(const CWallet* pwalletIn, const CTransaction& txIn) : CMerkleTx(txIn)
   int64 GetAvailableCredit(bool fUseCache=true) const
   {
     // Must wait until coinbase is safely deep enough in the chain before valuing it
-    if ((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0)
+    if((IsCoinBase() || IsCoinStake()) && GetBlocksToMaturity() > 0)
       return 0;
 
-    if (fUseCache && fAvailableCreditCached)
+    if(fUseCache && fAvailableCreditCached)
       return nAvailableCreditCached;
 
     int64 nCredit = 0;
-    for (unsigned int i = 0; i < vout.size(); i++)
+    for(unsigned int i = 0; i < vout.size(); i++)
     {
-      if (!IsSpent(i))
+      if(!IsSpent(i))
       {
         const CTxOut &txout = vout[i];
         nCredit += pwallet->GetCredit(txout);
-        if (!MoneyRange(nCredit))
+        if(!MoneyRange(nCredit))
           throw std::runtime_error("CWalletTx::GetAvailableCredit() : value out of range");
       }
     }
@@ -550,8 +553,10 @@ CWalletTx(const CWallet* pwalletIn, const CTransaction& txIn) : CMerkleTx(txIn)
     return nChangeCached;
   }
 
-  void GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, std::list<std::pair<CBitcoinAddress, int64> >& listReceived,
-                  std::list<std::pair<CBitcoinAddress, int64> >& listSent, int64& nFee, std::string& strSentAccount) const;
+  void GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, 
+                  std::list<std::pair<CBitcoinAddress, int64> >& listReceived,
+                  std::list<std::pair<CBitcoinAddress, int64> >& listSent, 
+                  int64& nFee, std::string& strSentAccount) const;
 
   void GetAccountAmounts(const std::string& strAccount, int64& nGenerated, int64& nReceived, 
                          int64& nSent, int64& nFee) const;

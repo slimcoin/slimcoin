@@ -524,8 +524,10 @@ int CWalletTx::GetRequestCount() const
   return nRequests;
 }
 
-void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, list<pair<CBitcoinAddress, int64> >& listReceived,
-                           list<pair<CBitcoinAddress, int64> >& listSent, int64& nFee, string& strSentAccount) const
+void CWalletTx::GetAmounts(int64& nGeneratedImmature, int64& nGeneratedMature, 
+                           list<pair<CBitcoinAddress, int64> >& listReceived,
+                           list<pair<CBitcoinAddress, int64> >& listSent, int64& nFee, 
+                           string& strSentAccount) const
 {
   nGeneratedImmature = nGeneratedMature = nFee = 0;
   listReceived.clear();
@@ -1082,7 +1084,8 @@ bool CWallet::SelectCoins(int64 nTargetValue, unsigned int nSpendTime,
 
 
 
-bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend, CWalletTx& wtxNew, CReserveKey& reservekey, int64& nFeeRet)
+bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend, CWalletTx& wtxNew,
+                                CReserveKey& reservekey, int64& nFeeRet)
 {
   int64 nValue = 0;
   BOOST_FOREACH (const PAIRTYPE(CScript, int64)& s, vecSend)
@@ -1102,6 +1105,7 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend, CW
     CTxDB txdb("r");
     {
       nFeeRet = nTransactionFee;
+
       for(;;)
       {
         wtxNew.vin.clear();
@@ -1208,7 +1212,8 @@ bool CWallet::CreateTransaction(const vector<pair<CScript, int64> >& vecSend, CW
   return true;
 }
 
-bool CWallet::CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew, CReserveKey& reservekey, int64& nFeeRet)
+bool CWallet::CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew, 
+                                CReserveKey& reservekey, int64& nFeeRet)
 {
   vector< pair<CScript, int64> > vecSend;
   vecSend.push_back(make_pair(scriptPubKey, nValue));
@@ -1216,7 +1221,8 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& w
 }
 
 // slimcoin: create coin stake transaction
-bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int64 nSearchInterval, CTransaction& txNew)
+bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, 
+                              int64 nSearchInterval, CTransaction& txNew)
 {
   // The following split & combine thresholds are important to security
   // Should not be adjusted if you don't understand the consequences
@@ -1281,8 +1287,10 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
       if(CheckStakeKernelHash(nBits, block, txindex.pos.nTxPos - txindex.pos.nBlockPos,
                               *pcoin.first, prevoutStake, txNew.nTime - n, hashProofOfStake))
       {
+        bool fPrintCoinStake = (fDebug && GetBoolArg("-printcoinstake"));
+
         // Found a kernel
-        if(fDebug && GetBoolArg("-printcoinstake"))
+        if(fPrintCoinStake)
           printf("CreateCoinStake : kernel found\n");
 
         vector<valtype> vSolutions;
@@ -1292,18 +1300,19 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
 
         if(!Solver(scriptPubKeyKernel, whichType, vSolutions))
         {
-          if(fDebug && GetBoolArg("-printcoinstake"))
+          if(fPrintCoinStake)
             printf("CreateCoinStake : failed to parse kernel\n", whichType);
           break;
         }
 
-        if(fDebug && GetBoolArg("-printcoinstake"))
+        if(fPrintCoinStake)
           printf("CreateCoinStake : parsed kernel type=%d\n", whichType);
 
         if(whichType != TX_PUBKEY && whichType != TX_PUBKEYHASH)
         {
-          if(fDebug && GetBoolArg("-printcoinstake"))
+          if(fPrintCoinStake)
             printf("CreateCoinStake : no support for kernel type=%d\n", whichType);
+
           break;  // only support pay to public key and pay to address
         }
 
@@ -1313,13 +1322,12 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
           CKey key;
           if(!keystore.GetKey(uint160(vSolutions[0]), key))
           {
-            if(fDebug && GetBoolArg("-printcoinstake"))
+            if(fPrintCoinStake)
               printf("CreateCoinStake : failed to get key for kernel type=%d\n", whichType);
             break;  // unable to find corresponding public key
           }
           scriptPubKeyOut << key.GetPubKey() << OP_CHECKSIG;
-        }
-        else
+        }else
           scriptPubKeyOut = scriptPubKeyKernel;
 
         txNew.nTime -= n; 
@@ -1331,7 +1339,7 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int
         if(block.GetBlockTime() + nStakeSplitAge > txNew.nTime)
           txNew.vout.push_back(CTxOut(0, scriptPubKeyOut)); //split stake
 
-        if(fDebug && GetBoolArg("-printcoinstake"))
+        if(fPrintCoinStake)
           printf("CreateCoinStake : added kernel type=%d\n", whichType);
 
         fKernelFound = true;

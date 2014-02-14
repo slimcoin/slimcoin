@@ -620,7 +620,7 @@ bool CTxMemPool::accept(CTxDB& txdb, CTransaction &tx, bool fCheckInputs,
     // This is done last to help prevent CPU exhaustion denial-of-service attacks.
     if(!tx.ConnectInputs(txdb, mapInputs, mapUnused, CDiskTxPos(1,1,1), pindexBest, false, false))
     {
-      return error("CTxMemPool::accept() : ConnectInputs failed %s", hash.ToString().substr(0,10).c_str());
+      return error("CTxMemPool::accept() : ConnectInputs failed %s", hash.ToString().substr(0, 10).c_str());
     }
   }
 
@@ -3653,11 +3653,11 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
     if(!(*nNonce & 0xffff))
     {
       *nHashesDone = 0xffff + 1;
-      return (unsigned int) -1;
+      return (u32int) -1;
     }
   }
 
-  return (u32int)-1;
+  return (u32int) -1;
 }
 
 // Some explaining would be appreciated
@@ -4110,12 +4110,8 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
       if(nNonceFound != (unsigned int) -1)
       {
 
-        //~ printf("Possible block %s\n", test_hash.ToString().c_str());
-
         if(test_hash <= hashTarget)
         {
-          //~ printf("Thash %s\nPblock->GetHash %s\n", 
-                 //~ test_hash.ToString().c_str(), pblock->GetHash().ToString().c_str());
 
           // Found a solution!
           assert(test_hash == pblock->GetHash());

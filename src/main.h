@@ -439,6 +439,8 @@ public:
   std::vector<CTxOut> vout;
   unsigned int nLockTime;
 
+  CBitcoinAddress burnPayoutAddress;
+
   // Denial-of-service detection:
   mutable int nDoS;
   bool DoS(int nDoSIn, bool fIn) const { nDoS += nDoSIn; return fIn; }
@@ -481,17 +483,22 @@ public:
   bool IsFinal(int nBlockHeight=0, int64 nBlockTime=0) const
   {
     // Time based nLockTime implemented in 0.1.6
-    if (nLockTime == 0)
+    if(!nLockTime)
       return true;
-    if (nBlockHeight == 0)
+
+    if(!nBlockHeight)
       nBlockHeight = nBestHeight;
-    if (nBlockTime == 0)
+
+    if(!nBlockTime)
       nBlockTime = GetAdjustedTime();
-    if ((int64)nLockTime < ((int64)nLockTime < LOCKTIME_THRESHOLD ? (int64)nBlockHeight : nBlockTime))
+
+    if((int64)nLockTime < ((int64)nLockTime < LOCKTIME_THRESHOLD ? (int64)nBlockHeight : nBlockTime))
       return true;
+
     BOOST_FOREACH(const CTxIn& txin, vin)
-      if (!txin.IsFinal())
+      if(!txin.IsFinal())
         return false;
+
     return true;
   }
 
@@ -1078,7 +1085,8 @@ public:
 
     // Flush stdio buffers and commit to disk before returning
     fflush(fileout);
-    if (!IsInitialBlockDownload() || (nBestHeight+1) % 500 == 0)
+
+    if(!IsInitialBlockDownload() || (nBestHeight+1) % 500 == 0)
     {
 #ifdef WIN32
       _commit(_fileno(fileout));
@@ -1244,14 +1252,13 @@ public:
     nStakeModifier = 0;
     nStakeModifierChecksum = 0;
     hashProofOfStake = 0;
-    if (block.IsProofOfStake())
+
+    if(block.IsProofOfStake())
     {
       SetProofOfStake();
       prevoutStake = block.vtx[1].vin[0].prevout;
       nStakeTime = block.vtx[1].nTime;
-    }
-    else
-    {
+    }else{
       prevoutStake.SetNull();
       nStakeTime = 0;
     }
@@ -1267,8 +1274,10 @@ public:
   {
     CBlock block;
     block.nVersion       = nVersion;
-    if (pprev)
+
+    if(pprev)
       block.hashPrevBlock = pprev->GetBlockHash();
+
     block.hashMerkleRoot = hashMerkleRoot;
     block.nTime          = nTime;
     block.nBits          = nBits;

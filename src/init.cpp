@@ -113,18 +113,9 @@ int main(int argc, char **argv)
   bool fRet = false;
 
 #if DEBUG_INIT
+  //manually turn on print to console
   fPrintToConsole = true;
-  printf("!!!!!!!!!Automatically set printtoconsole to true for debug!!!!!!!!!\n");
-  printf("!!!!!!!!!set DEBUG_INIT to false when commiting!!!!!!!!!\n");
-
-  //I also included dcrypt.h up above, be sure of that
-
-  uint256 out;
-
-  //~ sha256((const uint8_t*)"Testing", 7, &out);
-  out = dcrypt((const uint8_t*)"Testing", 0);
-
-  printf("DCRYPT HASH is %s\n", out.ToString().c_str());
+  
 #endif
 
   fRet = AppInit(argc, argv);
@@ -640,6 +631,7 @@ bool AppInit2(int argc, char* argv[])
 
   RandAddSeedPerfmon();
 
+  //Start up the good stuff!
   if(!CreateThread(StartNode, NULL))
     ThreadSafeMessageBox(_("Error: CreateThread(StartNode) failed"), _("SLIMCoin"), wxOK | wxMODAL);
 

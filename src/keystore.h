@@ -116,6 +116,7 @@ typedef std::map<CBitcoinAddress, std::pair<std::vector<unsigned char>, std::vec
 /** Keystore which keeps the private keys encrypted.
  * It derives from the basic key store, which is used if no encryption is active.
  */
+
 class CCryptoKeyStore : public CBasicKeyStore
 {
 private:
@@ -176,8 +177,9 @@ CCryptoKeyStore() : fUseCrypto(false)
   {
     {
       LOCK(cs_KeyStore);
-      if (!IsCrypted())
+      if(!IsCrypted())
         return CBasicKeyStore::HaveKey(address);
+
       return mapCryptedKeys.count(address) > 0;
     }
     return false;

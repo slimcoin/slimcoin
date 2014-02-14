@@ -932,6 +932,62 @@ Value movecmd(const Array& params, bool fHelp)
   return true;
 }
 
+Value burncoins(const Array& params, bool fHelp)
+{
+  if(pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 5))
+    throw runtime_error(
+      "burncoins <fromaccount> <amount> [minconf=1] [comment] [comment-to]\n"
+      "<amount> is a real and is rounded to the nearest 0.000001\n"
+      "requires wallet passphrase to be set with walletpassphrase first");
+  if(!pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 5))
+    throw runtime_error(
+      "burncoins <fromaccount> <amount> [minconf=1] [comment] [comment-to]\n"
+      "<amount> is a real and is rounded to the nearest 0.000001");
+
+  string strAccount = AccountFromValue(params[0]);
+  
+  CBitcoinAddress burnAddress;
+  //if we are on the testnet, use the burn testnet address
+  if(fTestNet)
+    burnAddress.SetString("mmSLiMCoinTestnetBurnAddresscVtB16");    
+  else
+    burnAddress.SetString("1111111111111111111111111111111111");    
+
+  if(!burnAddress.IsValid())
+    throw JSONRPCError(-5, "Invalid slimcoin burnAddress");
+
+  int64 nAmount = AmountFromValue(params[1]);
+  if(nAmount < MIN_TXOUT_AMOUNT)
+    throw JSONRPCError(-101, "Send amount too small");
+
+  int nMinDepth = 1;
+  if(params.size() > 2)
+    nMinDepth = params[2].get_int();
+
+  CWalletTx wtx;
+  wtx.strFromAccount = strAccount;
+  wtx.burnPayoutAddress = burnAddress;
+
+  if(params.size() > 3 && params[3].type() != null_type && !params[3].get_str().empty())
+    wtx.mapValue["comment"] = params[3].get_str();
+  if(params.size() > 4 && params[4].type() != null_type && !params[4].get_str().empty())
+    wtx.mapValue["to"]      = params[4].get_str();
+
+  if(pwalletMain->IsLocked())
+    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+  // Check funds
+  int64 nBalance = GetAccountBalance(strAccount, nMinDepth);
+  if(nAmount > nBalance)
+    throw JSONRPCError(-6, "Account has insufficient funds");
+
+  // Send
+  string strError = pwalletMain->SendMoneyToBitcoinAddress(burnAddress, nAmount, wtx);
+  if(strError != "")
+    throw JSONRPCError(-4, strError);
+
+  return wtx.GetHash().GetHex();
+}
 
 Value sendfrom(const Array& params, bool fHelp)
 {
@@ -1275,7 +1331,7 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
   bool fAllAccounts = (strAccount == string("*"));
 
   // Generated blocks assigned to account ""
-  if((nGeneratedMature+nGeneratedImmature) != 0 && (fAllAccounts || strAccount == ""))
+  if((nGeneratedMature + nGeneratedImmature) && (fAllAccounts || strAccount == ""))
   {
     Object entry;
     entry.push_back(Pair("account", string("")));
@@ -1283,14 +1339,14 @@ void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDe
     {
       entry.push_back(Pair("category", wtx.GetDepthInMainChain() ? "immature" : "orphan"));
       entry.push_back(Pair("amount", ValueFromAmount(nGeneratedImmature)));
-    }
-    else
-    {
+    }else{
       entry.push_back(Pair("category", "generate"));
       entry.push_back(Pair("amount", ValueFromAmount(nGeneratedMature)));
     }
+
     if(fLong)
       WalletTxToJSON(wtx, entry);
+
     ret.push_back(entry);
   }
 
@@ -2074,7 +2130,7 @@ Value getblock(const Array& params, bool fHelp)
   std::string strHash = params[0].get_str();
   uint256 hash(strHash);
 
-  if(mapBlockIndex.count(hash) == 0)
+  if(!mapBlockIndex.count(hash))
     throw JSONRPCError(-5, "Block not found");
 
   CBlock block;
