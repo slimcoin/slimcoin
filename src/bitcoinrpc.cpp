@@ -966,7 +966,6 @@ Value burncoins(const Array& params, bool fHelp)
 
   CWalletTx wtx;
   wtx.strFromAccount = strAccount;
-  wtx.burnPayoutAddress = burnAddress;
 
   if(params.size() > 3 && params[3].type() != null_type && !params[3].get_str().empty())
     wtx.mapValue["comment"] = params[3].get_str();
@@ -2359,6 +2358,7 @@ static const CRPCCommand vRPCCommands[] =
   //  ------------------------  -----------------------  ----------
   { "help",                   &help,                   true },
   { "stop",                   &stop,                   true },
+  { "burncoins",              &burncoins,              false },
   { "getblockcount",          &getblockcount,          true },
   { "getblocknumber",         &getblocknumber,         true },
   { "getconnectioncount",     &getconnectioncount,     true },
@@ -3018,6 +3018,8 @@ int CommandLineRPC(int argc, char *argv[])
     if(strMethod == "move"                   && n > 3) ConvertTo<boost::int64_t>(params[3]);
     if(strMethod == "sendfrom"               && n > 2) ConvertTo<double>(params[2]);
     if(strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>(params[3]);
+    if(strMethod == "burncoins"              && n > 1) ConvertTo<double>(params[1]);
+    if(strMethod == "burncoins"              && n > 2) ConvertTo<boost::int64_t>(params[2]);
     if(strMethod == "listtransactions"       && n > 1) ConvertTo<boost::int64_t>(params[1]);
     if(strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>(params[2]);
     if(strMethod == "listaccounts"           && n > 0) ConvertTo<boost::int64_t>(params[0]);

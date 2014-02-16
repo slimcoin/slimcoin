@@ -2246,14 +2246,17 @@ FILE* AppendBlockFile(unsigned int& nFileRet)
     FILE* file = OpenBlockFile(nCurrentBlockFile, 0, "ab");
     if(!file)
       return NULL;
-    if(fseek(file, 0, SEEK_END) != 0)
+
+    if(fseek(file, 0, SEEK_END))
       return NULL;
+
     // FAT32 filesize max 4GB, fseek and ftell max 2GB, so we must stay under 2GB
     if(ftell(file) < 0x7F000000 - MAX_SIZE)
     {
       nFileRet = nCurrentBlockFile;
       return file;
     }
+
     fclose(file);
     nCurrentBlockFile++;
   }

@@ -683,28 +683,60 @@ bool CTxDB::LoadBlockIndex()
     if(!block.ReadFromDisk(pindex))
       return error("LoadBlockIndex() : block.ReadFromDisk failed");
 
-    //~ printf("Block %d has this many transactions in it: %d\n", pindex->nHeight, block.vtx.size());
 
-    printf("\t%d PoB payout is %s\n", pindex->nHeight, block.vtx[0].burnPayoutAddress.ToString().c_str());
+    ///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
+
+    printf("Block %d has this many transactions in it: %d, Block Pos %d\n", 
+           pindex->nHeight, block.vtx.size(), pindex->nBlockPos);
+
+    //~ printf("\t%d PoB payout is %s\n", pindex->nHeight, block.vtx[0].burnPayoutAddress.ToString().c_str());
 
     //TODO: block 548 has a burned transaction of 25 coins, examine it
-    if(pindex->nHeight == 572 && true)
+    //639 has 14 burnt coins in it and also the burnPayoutAddress is supposed to be set
+    if(pindex->nHeight == 639 && true)
     {
-      block.vtx[2].vin[0].print();
-      block.vtx[2].vin[1].print();
-      block.vtx[2].vin[2].print();
+      //~ u32int test = 0;
+      //~ CTransaction testTrans;
+      //~ CBitcoinAddress printAddr;
+      //~ for(; test < block.vtx[2].vin.size(); test++)
+      //~ {
+        //~ printf("+++++++++++++++++++++++++++++++++++++++\n");
+        //~ block.vtx[2].vin[test].print();
+        //~ printf("---------------------------------------\n");
+
+        //~ CTxIn input = block.vtx[2].vin[test];
+
+        //~ //read and print the transaction
+        //~ testTrans.ReadFromDisk(input.prevout);
+
+        //~ //get the address
+        //~ ExtractAddress(testTrans.vout[input.prevout.n].scriptPubKey, printAddr);
+
+        //~ printf("To address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
+               //~ printAddr.ToString().c_str(), testTrans.vout[input.prevout.n].nValue / COIN);
+      //~ }
+
       //~ printf("\tPoB payout is %s\n", block.vtx[0].burnPayoutAddress.ToString().c_str());
 
+      CBitcoinAddress printAddr;
+      block.vtx[2].GetSendersAddress(printAddr);      
+      printf("To address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
+             printAddr.ToString().c_str(), 0);
+
       //Testnet Burn address is: mmSLiMCoinTestnetBurnAddresscVtB16
-      CBitcoinAddress test_address;
-      if(ExtractAddress(block.vtx[2].vout[1].scriptPubKey, test_address))
-      //~ if(ExtractAddress(block.vtx[2].vin[1].scriptSig, test_address))
-        printf("\tFrom address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
-               test_address.ToString().c_str(), block.vtx[2].vout[1].nValue / COIN);
+      if(ExtractAddress(block.vtx[2].vout[1].scriptPubKey, printAddr))
+        printf("\tTo address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
+               printAddr.ToString().c_str(), block.vtx[2].vout[1].nValue / COIN);
       else
         printf("+++++++++++++++Some sort of ERROR\n");
       
     }
+
+    ///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////
 
     // check level 1: verify block validity
     if(nCheckLevel > 0 && !block.CheckBlock())

@@ -237,7 +237,8 @@ public:
 
   std::string ToString() const
   {
-    return strprintf("COutPoint(%s, %d)", hash.ToString().substr(0,10).c_str(), n);
+    //~ return strprintf("COutPoint(%s, %d)", hash.ToString().substr(0,10).c_str(), n);
+    return strprintf("COutPoint(%s, %d)", hash.ToString().c_str(), n);
   }
 
   void print() const
@@ -406,6 +407,7 @@ public:
     if (IsEmpty()) return "CTxOut(empty)";
     if (scriptPubKey.size() < 6)
       return "CTxOut(error)";
+
     return strprintf("CTxOut(nValue=%s, scriptPubKey=%s)", FormatMoney(nValue).c_str(), scriptPubKey.ToString().c_str());
   }
 
@@ -438,8 +440,6 @@ public:
   std::vector<CTxIn> vin;
   std::vector<CTxOut> vout;
   unsigned int nLockTime;
-
-  CBitcoinAddress burnPayoutAddress;
 
   // Denial-of-service detection:
   mutable int nDoS;
@@ -583,6 +583,20 @@ public:
     return nValueOut;
   }
 
+  //Returns the address of the first txIn in addressRet
+  bool GetSendersAddress(CBitcoinAddress &addressRet)
+  {
+    CTxIn input = vin[0];
+    CTransaction prevTx;
+
+    //read the transaction of the prevout
+    if(prevTx.ReadFromDisk(input.prevout) == false)
+      return false; //if the read disk failed
+
+    //Extract the address from the indexed TxOut's scriptPubKey
+    return ExtractAddress(prevTx.vout[input.prevout.n].scriptPubKey, addressRet);
+  }
+
   /** Amount of bitcoins coming in to this transaction
       Note that lightweight clients may not know anything besides the hash of previous transactions,
       so may not be able to calculate this.
@@ -708,6 +722,7 @@ public:
                      vin.size(),
                      vout.size(),
                      nLockTime);
+
     for (unsigned int i = 0; i < vin.size(); i++)
       str += "    " + vin[i].ToString() + "\n";
     for (unsigned int i = 0; i < vout.size(); i++)
@@ -1067,7 +1082,7 @@ public:
   {
     // Open history file to append
     CAutoFile fileout = CAutoFile(AppendBlockFile(nFileRet), SER_DISK, CLIENT_VERSION);
-    if (!fileout)
+    if(!fileout)
       return error("CBlock::WriteToDisk() : AppendBlockFile failed");
 
     // Write index header
@@ -1078,8 +1093,9 @@ public:
 
     // Write block
     long fileOutPos = ftell(fileout);
-    if (fileOutPos < 0)
+    if(fileOutPos < 0)
       return error("CBlock::WriteToDisk() : ftell failed");
+
     nBlockPosRet = fileOutPos;
     fileout << *this;
 
