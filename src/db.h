@@ -90,9 +90,9 @@ protected:
   template<typename K, typename T>
     bool Write(const K& key, const T& value, bool fOverwrite=true)
   {
-    if (!pdb)
+    if(!pdb)
       return false;
-    if (fReadOnly)
+    if(fReadOnly)
       assert(!"Write called on database in read-only mode");
 
     // Key
@@ -111,8 +111,8 @@ protected:
     int ret = pdb->put(GetTxn(), &datKey, &datValue, (fOverwrite ? 0 : DB_NOOVERWRITE));
 
     // Clear memory in case it was a private key
-    memset(datKey.get_data(), 0, datKey.get_size());
-    memset(datValue.get_data(), 0, datValue.get_size());
+    memset(datKey.get_data(), 0x0, datKey.get_size());
+    memset(datValue.get_data(), 0x0, datValue.get_size());
     return (ret == 0);
   }
 

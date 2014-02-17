@@ -3637,7 +3637,6 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
 
   for(;;)
   {
-
     //hash the block
     (*nNonce)++;
 

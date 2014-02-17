@@ -42,6 +42,7 @@ public:
 
     bool EraseName(const std::string& strAddress);
 
+    //All transactions
     bool ReadTx(uint256 hash, CWalletTx& wtx)
     {
         return Read(std::make_pair(std::string("tx"), hash), wtx);
@@ -57,6 +58,24 @@ public:
     {
         nWalletDBUpdated++;
         return Erase(std::make_pair(std::string("tx"), hash));
+    }
+    
+    //Burn transactions
+    bool ReadBurnTx(uint256 hash, CWalletTx& wtx)
+    {
+        return Read(std::make_pair(std::string("burnTx"), hash), wtx);
+    }
+
+    bool WriteBurnTx(uint256 hash, const CWalletTx& wtx)
+    {
+        nWalletDBUpdated++;
+        return Write(std::make_pair(std::string("burnTx"), hash), wtx);
+    }
+
+    bool EraseBurnTx(uint256 hash)
+    {
+        nWalletDBUpdated++;
+        return Erase(std::make_pair(std::string("burnTx"), hash));
     }
 
     bool ReadKey(const std::vector<unsigned char>& vchPubKey, CPrivKey& vchPrivKey)

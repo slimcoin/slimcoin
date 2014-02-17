@@ -16,7 +16,7 @@
 
 #include <list>
 
-//the size of the block to hash
+//the size of the block to hash, from the nVersion to the nNonce
 #define HASH_PBLOCK_SIZE(pblock)  UEND(pblock->nNonce) - UBEGIN(pblock->nVersion)
 #define HASH_BLOCK_SIZE(block)    UEND(block.nNonce) - UBEGIN(block.nVersion)
 
@@ -266,14 +266,16 @@ public:
     nSequence = std::numeric_limits<unsigned int>::max();
   }
 
-  explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
+  explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), 
+                 unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
   {
     prevout = prevoutIn;
     scriptSig = scriptSigIn;
     nSequence = nSequenceIn;
   }
 
-  CTxIn(uint256 hashPrevTx, unsigned int nOut, CScript scriptSigIn=CScript(), unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
+  CTxIn(uint256 hashPrevTx, unsigned int nOut, CScript scriptSigIn=CScript(), 
+        unsigned int nSequenceIn=std::numeric_limits<unsigned int>::max())
   {
     prevout = COutPoint(hashPrevTx, nOut);
     scriptSig = scriptSigIn;
@@ -913,6 +915,13 @@ public:
   unsigned int nBits;
   unsigned int nNonce;
 
+  // Proof of Burn switch and indexes
+  bool fProofOfBurn;
+  //indexes to which block, transaction, out transaction the burnt coins are in
+  s32int burnBlkHeight;
+  s32int burnCTx;
+  s32int burnCTxOut;
+
   // network and disk
   std::vector<CTransaction> vtx;
 
@@ -933,6 +942,7 @@ public:
 
   IMPLEMENT_SERIALIZE
     (
+      //The block header
       READWRITE(this->nVersion);
       nVersion = this->nVersion;
       READWRITE(hashPrevBlock);
@@ -941,17 +951,23 @@ public:
       READWRITE(nBits);
       READWRITE(nNonce);
 
+      //PoB data
+      READWRITE(fProofOfBurn);
+      READWRITE(burnBlkHeight);
+      READWRITE(burnCTx);
+      READWRITE(burnCTxOut);
+
       // ConnectBlock depends on vtx following header to generate CDiskTxPos
-      if (!(nType & (SER_GETHASH|SER_BLOCKHEADERONLY)))
+      if(!(nType & (SER_GETHASH | SER_BLOCKHEADERONLY)))
       {
         READWRITE(vtx);
         READWRITE(vchBlockSig);
-      }
-      else if (fRead)
+      }else if(fRead)
       {
         const_cast<CBlock*>(this)->vtx.clear();
         const_cast<CBlock*>(this)->vchBlockSig.clear();
       }
+      
       )
 
     void SetNull()
@@ -962,6 +978,11 @@ public:
     nTime = 0;
     nBits = 0;
     nNonce = 0;
+
+    //proof of burn defaults
+    fProofOfBurn = false;
+    burnBlkHeight = burnCTx = burnCTxOut = -1; //set indexes to negative
+
     vtx.clear();
     vchBlockSig.clear();
     vMerkleTree.clear();
@@ -970,7 +991,7 @@ public:
 
   bool IsNull() const
   {
-    return (nBits == 0);
+    return (!nBits);
   }
 
   uint256 GetHash() const
@@ -1001,15 +1022,22 @@ public:
     return hashSig.Get64();
   }
 
-  // slimcoin: two types of block: proof-of-work or proof-of-stake
+  // slimcoin: three types of block: proof-of-work, proof-of-stake, or proof-of-burn
   bool IsProofOfStake() const
   {
     return (vtx.size() > 1 && vtx[1].IsCoinStake());
   }
 
+  bool IsProofOfBurn() const
+  {
+    //be sure it is not a PoS block and the burnIndexes are fine
+    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0 && !IsProofOfStake();
+  }
+
   bool IsProofOfWork() const
   {
-    return !IsProofOfStake();
+    //!IsProofOfStake is called in IsProofOfBurn, so no need to call it again
+    return !IsProofOfBurn();
   }
 
   std::pair<COutPoint, unsigned int> GetProofOfStake() const
@@ -1122,7 +1150,7 @@ public:
     CAutoFile filein = CAutoFile(OpenBlockFile(nFile, nBlockPos, "rb"), SER_DISK, CLIENT_VERSION);
     if (!filein)
       return error("CBlock::ReadFromDisk() : OpenBlockFile failed");
-    if (!fReadTransactions)
+    if(!fReadTransactions)
       filein.nType |= SER_BLOCKHEADERONLY;
 
     // Read block
@@ -1134,7 +1162,7 @@ public:
     }
 
     // Check the header
-    if (fReadTransactions && IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
+    if(fReadTransactions && IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
       return error("CBlock::ReadFromDisk() : errors in block header");
 
     return true;

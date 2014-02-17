@@ -53,7 +53,7 @@ Value importprivkey(const Array& params, bool fHelp)
     CBitcoinSecret vchSecret;
     bool fGood = vchSecret.SetString(strSecret);
 
-    if(!fGood) throw JSONRPCError(-5,"Invalid private key");
+    if(!fGood) throw JSONRPCError(-5, "Invalid private key");
     if(pwalletMain->IsLocked())
         throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
     if(fWalletUnlockMintOnly) // slimcoin: no importprivkey in mint-only mode

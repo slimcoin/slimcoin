@@ -981,9 +981,13 @@ Value burncoins(const Array& params, bool fHelp)
     throw JSONRPCError(-6, "Account has insufficient funds");
 
   // Send
-  string strError = pwalletMain->SendMoneyToBitcoinAddress(burnAddress, nAmount, wtx);
+  string strError = pwalletMain->SendMoneyToBitcoinAddress(burnAddress, nAmount, wtx, false, true);
   if(strError != "")
     throw JSONRPCError(-4, strError);
+
+  for(std::map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
+      it != pwalletMain->mapBurnWallet.end(); it++)
+    printf("Burnt Hashes are %s\n", it->first.ToString().c_str());
 
   return wtx.GetHash().GetHex();
 }

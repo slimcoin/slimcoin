@@ -105,6 +105,7 @@ public:
   }
 
   std::map<uint256, CWalletTx> mapWallet;
+  std::map<uint256, CWalletTx> mapBurnWallet;
   std::vector<uint256> vWalletUpdated;
 
   std::map<uint256, int> mapRequestCount;
@@ -138,7 +139,7 @@ public:
   bool EncryptWallet(const SecureString& strWalletPassphrase);
 
   void MarkDirty();
-  bool AddToWallet(const CWalletTx& wtxIn);
+  bool AddToWallet(const CWalletTx& wtxIn, bool fBurnTx = false);
   bool AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate = false, bool fFindBlock = false);
   bool EraseFromWallet(uint256 hash);
   void WalletUpdateSpent(const CTransaction& prevout);
@@ -155,10 +156,11 @@ public:
   bool CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew,
                          CReserveKey& reservekey, int64& nFeeRet);
   bool CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, int64 nSearchInterval, CTransaction& txNew);
-  bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey);
-  std::string SendMoney(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew, bool fAskFee=false);
+  bool CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, bool fBurnTx = false);
+  std::string SendMoney(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew, 
+                        bool fAskFee = false, bool fBurnTx = false);
   std::string SendMoneyToBitcoinAddress(const CBitcoinAddress& address, int64 nValue,
-                                        CWalletTx& wtxNew, bool fAskFee=false);
+                                        CWalletTx& wtxNew, bool fAskFee = false, bool fBurnTx = false);
 
   bool NewKeyPool();
   bool TopUpKeyPool();
@@ -609,7 +611,7 @@ CWalletTx(const CWallet* pwalletIn, const CTransaction& txIn) : CMerkleTx(txIn)
     return true;
   }
 
-  bool WriteToDisk();
+  bool WriteToDisk(bool fBurnTx = false);
 
   int64 GetTxTime() const;
   int GetRequestCount() const;
