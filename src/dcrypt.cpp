@@ -206,6 +206,7 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
 
   for(count = 0; hashed_end == false; count++)
   {
+    //+1 to keeps a 0 value of *(hashed_nums + index) moving on
     i = hex_char_to_int(*(hashed_nums + index)) + 1;
     index += i;
     
@@ -217,7 +218,7 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
     }
     
     tmp_val = *(hashed_nums + index);
-    join_to_array(tmp_array, tmp_val);
+    join_to_array(tmp_array, tmp_val); //plop tmp_val at the end of tmp_array
     sha256_to_str(tmp_array, SHA256_LEN + 1, tmp_array, hash_digest);
 
     //check if the last value of hashed_nums is the same as the last value in tmp_array

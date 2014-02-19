@@ -12,20 +12,20 @@ static void digest_to_string(u8int *hash_digest, u8int *string)
     //format the most (left-most) significant 4bit hex
     tmp_val = *(hash_digest + i) >> 4;
 
-    //add 48 to get the integer into a char
+    //get the integer into a char
     if(tmp_val <= 9)
-      *(string + (i * 2)) = tmp_val + 48;
+      *(string + (i * 2)) = tmp_val + '0';
     else //add 87 to get the integer into the a-f of a hex
-      *(string + (i * 2)) = tmp_val + 87;
+      *(string + (i * 2)) = tmp_val + 87; //ex: if tmp_val == 10 (0xa) then + 87 equals char 'a'
 
     //format the least (right-most) significant 4bit hex
     tmp_val = *(hash_digest + i) & 0x0F;
 
-    //add 48 to get the integer into a char
+    //get the integer into a char
     if(tmp_val <= 9)
-      *(string + (i * 2) + 1) = tmp_val + 48;
+      *(string + (i * 2) + 1) = tmp_val + '0';
     else //add 87 to get the integer into the a-f of a hex
-      *(string + (i * 2) + 1) = tmp_val + 87;
+      *(string + (i * 2) + 1) = tmp_val + 87; //ex: if tmp_val == 10 (0xa) then + 87 equals char 'a'
 
   }
 

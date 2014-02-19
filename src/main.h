@@ -588,6 +588,9 @@ public:
   //Returns the address of the first txIn in addressRet
   bool GetSendersAddress(CBitcoinAddress &addressRet)
   {
+    if(vin.empty())
+      return false;
+    
     CTxIn input = vin[0];
     CTransaction prevTx;
 
@@ -1031,13 +1034,18 @@ public:
   bool IsProofOfBurn() const
   {
     //be sure it is not a PoS block and the burnIndexes are fine
-    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0 && !IsProofOfStake();
+    printf("===========================================FPoB %d, Height %d, CTx %d, CTcOut %d, pos %d\n",
+           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut, IsProofOfStake());
+    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0;
   }
 
   bool IsProofOfWork() const
   {
     //!IsProofOfStake is called in IsProofOfBurn, so no need to call it again
-    return !IsProofOfBurn();
+
+    //TODO: Boy-oh-Boy, much segments
+    return !IsProofOfBurn() && !IsProofOfStake();
+    //~ return !IsProofOfStake();
   }
 
   std::pair<COutPoint, unsigned int> GetProofOfStake() const

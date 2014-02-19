@@ -944,6 +944,18 @@ Value burncoins(const Array& params, bool fHelp)
       "burncoins <fromaccount> <amount> [minconf=1] [comment] [comment-to]\n"
       "<amount> is a real and is rounded to the nearest 0.000001");
 
+  
+  //TODO do more testing with this
+
+  printf("===========================================================\n");
+  for(std::map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
+      it != pwalletMain->mapBurnWallet.end(); it++)
+    printf("Burnt Hashes are %s\n", it->first.ToString().c_str());
+
+  printf("Amount %"PRI64d" WOW\n", AmountFromValue(params[1]));
+  if(AmountFromValue(params[1]) != 3 * COIN)
+    return true;
+
   string strAccount = AccountFromValue(params[0]);
   
   CBitcoinAddress burnAddress;
@@ -984,10 +996,6 @@ Value burncoins(const Array& params, bool fHelp)
   string strError = pwalletMain->SendMoneyToBitcoinAddress(burnAddress, nAmount, wtx, false, true);
   if(strError != "")
     throw JSONRPCError(-4, strError);
-
-  for(std::map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
-      it != pwalletMain->mapBurnWallet.end(); it++)
-    printf("Burnt Hashes are %s\n", it->first.ToString().c_str());
 
   return wtx.GetHash().GetHex();
 }
@@ -1442,7 +1450,10 @@ Value listtransactions(const Array& params, bool fHelp)
 
   // Note: maintaining indices in the database of (account,time) --> txid and (account, time) --> acentry
   // would make this much faster for applications that do this a lot.
-  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
+  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
+        it != pwalletMain->mapBurnWallet.end(); ++it)
+  //~ for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); 
+        //~ it != pwalletMain->mapWallet.end(); ++it)
   {
     CWalletTx* wtx = &((*it).second);
     txByTime.insert(make_pair(wtx->GetTxTime(), TxPair(wtx, (CAccountingEntry*)0)));
