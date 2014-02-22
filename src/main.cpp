@@ -1801,7 +1801,8 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
   return true;
 }
 
-
+//MYTODO: Check this out, need to add IsPoB in pindex, CheckIndex is executed in CTxDB::LoadBlockIndex, 
+// what cause problems is main.h::1422
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
   // Check for duplicate
@@ -1988,6 +1989,7 @@ bool CBlock::AcceptBlock()
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
   if(mi == mapBlockIndex.end())
     return DoS(10, error("AcceptBlock() : prev block not found"));
+
   CBlockIndex* pindexPrev = (*mi).second;
   int nHeight = pindexPrev->nHeight + 1;
 

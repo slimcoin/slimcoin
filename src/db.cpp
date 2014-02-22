@@ -613,7 +613,7 @@ bool CTxDB::LoadBlockIndex()
     }    // try
     catch (std::exception &e)
     {
-      return error("%s() : deserialize error", __PRETTY_FUNCTION__);
+      return error("%s : deserialize error", __PRETTY_FUNCTION__);
     }
   }
   pcursor->close();

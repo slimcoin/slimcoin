@@ -109,8 +109,6 @@ void expand_hash(uint8_t *hash, uint8_t *salt, uint8_t *hash_digest, uint32_t ex
   uint32_t i;
   for(i = 0; i < expand_times; i++)
   {
-    //TODO, dectrypt needs all sha256 changed to sha256_to_str and just the final one be sha256
-
     //get the salt by hashing what is in output
     sha256_to_str(output, (i + 1) * SHA256_LEN, salt, hash_digest);
 

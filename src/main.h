@@ -120,6 +120,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
+bool CheckProofOfBurn(uint256 hash, unsigned int nBits);
 int64 GetProofOfWorkReward(unsigned int nBits);
 int64 GetProofOfStakeReward(int64 nCoinAge);
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);
@@ -1300,6 +1301,11 @@ public:
   unsigned int nBits;
   unsigned int nNonce;
 
+  // Proof of Burn switch and indexes
+  bool fProofOfBurn;
+  s32int burnBlkHeight;
+  s32int burnCTx;
+  s32int burnCTxOut;
 
   CBlockIndex()
   {
@@ -1324,6 +1330,12 @@ public:
     nTime          = 0;
     nBits          = 0;
     nNonce         = 0;
+
+    //PoB
+    fProofOfBurn = false;
+    burnBlkHeight = -1;
+    burnCTx = -1;
+    burnCTxOut = -1;
   }
 
   CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1357,6 +1369,12 @@ public:
     nTime          = block.nTime;
     nBits          = block.nBits;
     nNonce         = block.nNonce;
+
+    //PoB
+    fProofOfBurn   = block.fProofOfBurn;
+    burnBlkHeight  = block.burnBlkHeight;
+    burnCTx        = block.burnCTx;
+    burnCTxOut     = block.burnCTxOut;
   }
 
   CBlock GetBlockHeader() const
@@ -1400,7 +1418,17 @@ public:
 
   bool CheckIndex() const
   {
-    return IsProofOfWork() ? CheckProofOfWork(GetBlockHash(), nBits) : true;
+    if(IsProofOfWork())
+      return CheckProofOfWork(GetBlockHash(), nBits);
+    else if(IsProofOfBurn())
+    {
+      uint256 burnHash;
+      GetBurnHash(burnBlkHeight, burnCTx, burnCTxOut, burnHash);
+      return CheckProofOfBurn(burnHash, nBits);
+    }else if(IsProofOfStake())
+      return true;
+    else
+      return false;
   }
 
   bool EraseBlockFromDisk()
@@ -1446,9 +1474,14 @@ public:
     return pindex->GetMedianTimePast();
   }
 
+  bool IsProofOfBurn() const
+  {
+    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0;
+  }
+
   bool IsProofOfWork() const
   {
-    return !(nFlags & BLOCK_PROOF_OF_STAKE);
+    return !(nFlags & BLOCK_PROOF_OF_STAKE) && !IsProofOfBurn();
   }
 
   bool IsProofOfStake() const
@@ -1559,6 +1592,12 @@ public:
       READWRITE(nTime);
       READWRITE(nBits);
       READWRITE(nNonce);
+
+      // PoB
+      READWRITE(fProofOfBurn);
+      READWRITE(burnBlkHeight);
+      READWRITE(burnCTx);
+      READWRITE(burnCTxOut);
       )
 
     uint256 GetBlockHash() const
