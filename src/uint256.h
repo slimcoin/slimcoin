@@ -17,8 +17,6 @@ typedef unsigned long long  uint64;
 
 inline int Testuint256AdHoc(std::vector<std::string> vArg);
 
-
-
 /** Base class without constructors for uint256 and uint160.
  * This makes the compiler let you use it in a union.
  */

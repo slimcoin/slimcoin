@@ -6,8 +6,15 @@
 
 #include "kernel.h"
 #include "db.h"
+#include "init.h"
+
+#include <math.h>       /* pow */
 
 using namespace std;
+
+//Burn addresses
+const CBitcoinAddress burnOfficialAddress("1111111111111111111111111111111111");
+const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 // Protocol switch time of v0.3 kernel protocol
 unsigned int nProtocolV03SwitchTime     = 1363800000;
@@ -64,11 +71,10 @@ static int64 GetStakeModifierSelectionInterval()
 // select a block from the candidate blocks in vSortedByTimestamp, excluding
 // already selected blocks in vSelectedBlocks, and with timestamp up to
 // nSelectionIntervalStop.
-static bool SelectBlockFromCandidates(
-  vector<pair<int64, uint256> >& vSortedByTimestamp,
-  map<uint256, const CBlockIndex*>& mapSelectedBlocks,
-  int64 nSelectionIntervalStop, uint64 nStakeModifierPrev,
-  const CBlockIndex** pindexSelected)
+static bool SelectBlockFromCandidates(vector<pair<int64, uint256> >& vSortedByTimestamp,
+                                      map<uint256, const CBlockIndex*>& mapSelectedBlocks,
+                                      int64 nSelectionIntervalStop, uint64 nStakeModifierPrev,
+                                      const CBlockIndex** pindexSelected)
 {
   bool fSelected = false;
   uint256 hashBest = 0;
@@ -420,4 +426,147 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
   if(mapStakeModifierCheckpoints.count(nHeight))
     return nStakeModifierChecksum == mapStakeModifierCheckpoints[nHeight];
   return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+/*                              Proof Of Burn                               */
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
+//Scans all of the hashes of this transaction and returns the smallest one
+bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
+{
+  /*slimcoin: a hash is calculated by:
+   * hash = (c / b) * 2 ** ((last_BlkNHeight - burned_BlkNHeight) / E) * [Hash]
+   *
+   * Where: c = BURN_CONSTANT
+   *        b = amount of coins burned
+   *        last_BlkNHeight = the height of the last block in the chain
+   *        burned_BlkNHeight = the height of the block at the time of the burning
+   *        E = BURN_HASH_DOUBLE, an exponential constant which causes 
+   *                                   burnt coins to produce slightly larger hashes as time passes
+   *
+   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ nTime)
+   *        Where: burntBlockHash = the hash of the block the transaction is found ing
+   *               burnTx.GetHash() = the hash of this transaction
+   *               nTime = an integer 'x' where prevprevBlock.nTime < x <= prevBlock.nTime
+   *               Where: prevprevBlock = the block before the last block in the chain
+   *                      prevBlock = the last block in the chain
+   */
+
+  //check if the wallet transaction has a block hash connected to it
+  if(!burnWTx.hashBlock)
+    return error("ScanBurnHashes: burnWtx.hashBlock == 0, the transaction has %d confirmations", 
+                 burnWTx.GetDepthInMainChain());
+
+  //start off the smallest hash the absolute biggest it can be
+  smallestHashRet = ~uint256(0);
+
+  //find the burnt transaction
+  const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
+
+  if(!burnAddress.IsValid())
+    return error("ScanBurnHashes: Burn address is invalid");
+
+  CTxOut burnTxOut;
+  BOOST_FOREACH(const CTxOut &txout, burnWTx.vout)
+  {
+    CBitcoinAddress address;
+    if(!ExtractAddress(txout.scriptPubKey, address))
+      continue;
+
+    if(!address.IsValid())
+      continue;
+
+    if(address == burnAddress)
+    {
+      burnTxOut = txout;
+      break;
+    }
+  }
+
+  //if burnTxOut is still null, that means it did not find a burn transaction in burnWTx
+  if(burnTxOut.IsNull())
+    return error("ScanBurnHashes: Did not find a burn transaction in burnWTx");
+
+  if(!burnTxOut.nValue)
+    return error("ScanBurnHashes: Burn transaction's value is 0");
+
+  //get the boundaries for nTime
+  u32int startTime, endTime;
+  startTime = pindexBest->pprev->nTime;
+  endTime = pindexBest->nTime;
+
+  //this should not be possible!
+  if(startTime >= endTime)
+    return error("ScanBurnHashes: Search start time should be less than the end time");
+
+  u32int last_nHeight, burned_nHeight;
+  last_nHeight = pindexBest->nHeight;
+  burned_nHeight = mapBlockIndex[burnWTx.hashBlock]->nHeight;
+
+  //calculate the multiplier for the hash
+  const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
+    pow(2, (last_nHeight - burned_nHeight) / BURN_HASH_DOUBLE);
+
+  //the largest value a uint256 can store
+  const CBigNum bnMax(~uint256(0));
+  CBigNum bnTest;
+
+  // Calculate hash going backwards
+  u32int i;
+  for(i = endTime; i > startTime; i--)
+  {
+    //package the data to be hashed and hash
+    CDataStream ss(SER_GETHASH, 0);
+    ss << burnWTx.hashBlock << burnWTx.GetHash() << i;
+    CBigNum bnHash(Hash(ss.begin(), ss.end()));
+    
+    //apply the multiplier
+    bnTest = bnHash * multiplier;
+
+    //if bignum test is too big to fir in a uint256, continue
+    if(bnTest > bnMax)
+      continue;
+
+    if(bnTest < CBigNum(smallestHashRet))
+      smallestHashRet = bnTest.getuint256();
+  }
+
+  //success!
+  return true;
+}
+
+std::pair<uint256, CWalletTx> HashAllBurntTx()
+{
+  //give the smallest hash the absolute largest value it can hold
+  uint256 smallestHash(~uint256(0));
+  CWalletTx smallestWTx;
+
+  //go through all of the burnt transactions in the mapBurnWallet
+  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
+      it != pwalletMain->mapBurnWallet.end(); ++it)
+  {
+    CWalletTx tmpWTx = it->second;
+    //~ printf("=============%s\n", tmpWTx.GetHash().ToString().c_str());
+    u32int confirms = tmpWTx.GetDepthInMainChain();
+    if(!confirms) //a transaction hash to have atleast some confirmations
+      continue;
+
+    uint256 tmpHash;
+    if(!ScanBurnHashes(tmpWTx, tmpHash))
+      continue;
+
+    if(tmpHash < smallestHash)
+    {
+      smallestHash = tmpHash;
+      smallestWTx = tmpWTx;
+    }
+
+  }
+  
+  return make_pair(smallestHash, smallestWTx);
 }

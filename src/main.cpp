@@ -13,7 +13,7 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-
+#include <math.h>       /* pow */
 
 #include "dcrypt.h"
 
@@ -39,12 +39,12 @@ static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 sin
 static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007ffff....
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
 int nCoinbaseMaturity = COINBASE_MATURITY_SMC;
-CBlockIndex* pindexGenesisBlock = NULL;
+CBlockIndex *pindexGenesisBlock = NULL;
 int nBestHeight = -1;
 CBigNum bnBestChainTrust = 0;
 CBigNum bnBestInvalidTrust = 0;
 uint256 hashBestChain = 0;
-CBlockIndex* pindexBest = NULL;
+CBlockIndex *pindexBest = NULL;
 int64 nTimeBestReceived = 0;
 
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
@@ -487,7 +487,10 @@ bool CTransaction::CheckTransaction() const
   if(IsCoinBase())
   {
     if(vin[0].scriptSig.size() < 2 || vin[0].scriptSig.size() > 100)
+    {
+      printf("SCRIPT size is %d\n", vin[0].scriptSig.size());
       return DoS(100, error("CTransaction::CheckTransaction() : coinbase script size"));
+    }
   }
   else
   {
@@ -974,6 +977,22 @@ bool CheckProofOfWork(uint256 hash, unsigned int nBits)
   // Check proof of work matches claimed amount
   if(hash > bnTarget.getuint256())
     return error("CheckProofOfWork() : hash doesn't match nBits");
+
+  return true;
+}
+
+bool CheckProofOfBurn(uint256 hash, unsigned int nBits)
+{
+  CBigNum bnTarget;
+  bnTarget.SetCompact(nBits);
+
+  // Check range
+  if(bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
+    return error("CheckProofOfBurn() : nBits below minimum work");
+
+  // Check proof of work matches claimed amount
+  if(hash > bnTarget.getuint256())
+    return error("CheckProofOfBurn() : hash doesn't match nBits");
 
   return true;
 }
@@ -1879,6 +1898,10 @@ bool CBlock::CheckBlock() const
   if(IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
     return DoS(50, error("CheckBlock() : proof of work failed"));
 
+  // Check proof of burn matches claimed amount
+  if(IsProofOfBurn() && !CheckProofOfBurn(GetBurnHash(), nBits))
+    return DoS(50, error("CheckBlock() : proof of burn failed"));
+
   // Check timestamp
   if(GetBlockTime() > GetAdjustedTime() + nMaxClockDrift)
     return error("CheckBlock() : block timestamp too far in the future");
@@ -1911,7 +1934,7 @@ bool CBlock::CheckBlock() const
     return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%u nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
 
   // Check coinbase reward
-  if(vtx[0].GetValueOut() > (IsProofOfWork() ? (GetProofOfWorkReward(nBits) - vtx[0].GetMinFee() + MIN_TX_FEE) : 0))
+  if(vtx[0].GetValueOut() > (IsProofOfWork() || IsProofOfBurn() ? (GetProofOfWorkReward(nBits) - vtx[0].GetMinFee() + MIN_TX_FEE) : 0))
     return DoS(50, error("CheckBlock() : coinbase reward exceeded %s > %s", 
                          FormatMoney(vtx[0].GetValueOut()).c_str(),
                          FormatMoney(IsProofOfWork()? GetProofOfWorkReward(nBits) : 0).c_str()));
@@ -3662,6 +3685,106 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
   return (u32int) -1;
 }
 
+//Gets the hash for PoB given only the indexes
+bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint256 &smallestHashRet)
+{
+  if(burnBlkHeight < 0 || burnCTx < 0 || burnCTxOut < 0)
+    return error("GetBurnHash(): Input indexes are invalid %d:%d:%d\n", burnBlkHeight, burnCTx, burnCTxOut);
+
+  //Get the block index by burnBlkHeight
+  CBlockIndex *pindex;
+  for(pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
+    if(pindex->nHeight == burnBlkHeight)
+      break;
+
+  if(!pindex || !pindex->pprev)
+    return error("GetBurnHash(): Block Height %d not found in block indexes", burnBlkHeight);
+
+  //Read the block containing this burnt transaction from the disk
+  CBlock block;
+  if(!block.ReadFromDisk(pindex))
+    return error("GetBurnHash(): block.ReadFromDisk failed");
+
+  uint256 hashBlock = block.GetHash();
+
+  if(burnCTx >= block.vtx.size())
+    return error("GetBurnHash(): burn transaction index larger than block's number of transactions");
+
+  CTransaction burnTx = block.vtx[burnCTx];
+
+  if(burnCTxOut >= burnTx.vout.size())
+    return error("GetBurnHash(): burn OutTx index larger than transaction's number of out transactions");
+
+  CTxOut burnTxOut = burnTx.vout[burnCTxOut];
+
+  //check if burnTxOut's address is a burn address
+  // with a bunch of sanity checks
+  const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
+
+  if(!burnAddress.IsValid())
+    return error("GetBurnHash(): Burn address is invalid");
+
+  CBitcoinAddress address;
+  if(!ExtractAddress(burnTxOut.scriptPubKey, address))
+    return error("GetBurnHash(): ExtractAddress failed");
+
+  if(address != burnAddress)
+    return error("GetBurnHash(): TxOut's address is not a valid burn address");
+
+  if(!address.IsValid())
+    return error("GetBurnHash(): TxOut's address is invalid");
+
+  if(!burnTxOut.nValue)
+    return error("GetBurnHash(): Burn transaction's value is 0");
+
+  //get the boundaries for nTime
+  u32int startTime, endTime;
+  startTime = pindexBest->pprev->nTime;
+  endTime = pindexBest->nTime;
+
+  //this should not be possible!
+  if(startTime >= endTime)
+    return error("GetBurnHash(): Search start time should be less than the end time");
+
+  u32int last_nHeight, burned_nHeight;
+  last_nHeight = pindexBest->nHeight;
+  burned_nHeight = mapBlockIndex[hashBlock]->nHeight;
+
+  //calculate the multiplier for the hash
+  const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
+    pow(2, (last_nHeight - burned_nHeight) / BURN_HASH_DOUBLE);
+
+  //the largest value a uint256 can store
+  const CBigNum bnMax(~uint256(0));
+  CBigNum bnTest;
+
+  //start off the smallest hash the absolute biggest it can be
+  smallestHashRet = ~uint256(0);
+
+  // Calculate hash going backwards
+  u32int i;
+  for(i = endTime; i > startTime; i--)
+  {
+    //package the data to be hashed and hash
+    CDataStream ss(SER_GETHASH, 0);
+    ss << hashBlock << burnTx.GetHash() << i;
+    CBigNum bnHash(Hash(ss.begin(), ss.end()));
+    
+    //apply the multiplier
+    bnTest = bnHash * multiplier;
+
+    //if bignum test is too big to fir in a uint256, continue
+    if(bnTest > bnMax)
+      continue;
+
+    if(bnTest < CBigNum(smallestHashRet))
+      smallestHashRet = bnTest.getuint256();
+  }
+
+  //sucess!
+  return true;
+}
+
 // Some explaining would be appreciated
 class COrphan
 {
@@ -3973,10 +4096,15 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
 {
   uint256 hash = pblock->GetHash();
+  uint256 burnHash = pblock->IsProofOfBurn() ? pblock->GetBurnHash() : ~uint256(0);
+
   uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
 
   if(hash > hashTarget && pblock->IsProofOfWork())
     return error("SlimCoinMiner : proof-of-work not meeting target");
+
+  if(burnHash > hashTarget && pblock->IsProofOfBurn())
+    return error("SlimCoinMiner : proof-of-burn not meeting target");
 
   //// debug print
   printf("SlimCoinMiner:\n");
@@ -4191,6 +4319,97 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
         break;  // need to update coinbase timestamp
     }
   }
+}
+
+void SlimCoinAfterBurner(CWallet *pwallet)
+{
+  printf("CPUMiner started for proof-of-burn\n");
+  SetThreadPriority(THREAD_PRIORITY_LOWEST);
+
+  // Each thread has its own key and counter
+  CReserveKey reservekey(pwallet);
+  CBlockIndex *pindexLastBlock = NULL;
+
+  for(;;)
+  {
+    if(fShutdown)
+      return;
+
+    while(vNodes.empty() || IsInitialBlockDownload())
+    {
+      Sleep(1000);
+      if(fShutdown)
+        return;
+    }
+
+    while(pwallet->IsLocked())
+    {
+      strMintWarning = strMintMessage;
+      Sleep(1000);
+    }
+
+    //if the best block in the chain has changed
+    if(pindexLastBlock != pindexBest)
+    {
+      //record the best block
+      pindexLastBlock = pindexBest;
+      
+      //calculate the smallest burn hash
+      uint256 smallestHash;
+      CWalletTx smallestWTx;
+      tie(smallestHash, smallestWTx) = HashAllBurntTx();
+
+      if(!smallestWTx.hashBlock)
+        continue;
+      
+      printf("=============================Smallest Hash is this %s\n\tby tx %s\n", 
+             smallestHash.ToString().c_str(), smallestWTx.GetHash().ToString().c_str());
+
+      //TODO: Now take this and ... make a function that returns these 3 values as a tuple and make a way to create a block
+      printf("\tBlock height %d, transaction depth %d, vout depth %d\n", 
+             mapBlockIndex.at(smallestWTx.hashBlock)->nHeight, 
+             smallestWTx.nIndex, smallestWTx.GetBurnOutTxIndex());
+
+      //
+      // Create new block
+      //
+      auto_ptr<CBlock> pblock(CreateNewBlock(pwallet));
+
+      uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
+      if(smallestHash < hashTarget)
+      {
+        printf("Tartget is %s\n", hashTarget.ToString().c_str());
+
+        //Set the PoB flags to true
+        pblock->fProofOfBurn = true;
+        smallestWTx.GetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
+
+        uint256 hasher;
+        GetBurnHash(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
+        printf("WOW such hash %s\n", hasher.ToString().c_str());
+
+        //TODO: CTransaction errors out when processing a block, no good, at main.cpp :: 491
+        // possible has to do with this
+        if(!pblock->SignBlock(*pwalletMain))
+        {
+          strMintWarning = strMintMessage;
+          continue;
+        }
+
+        strMintWarning = "";
+        printf("CPUMiner : proof-of-burn block found %s\n", pblock->GetHash().ToString().c_str()); 
+        SetThreadPriority(THREAD_PRIORITY_NORMAL);
+        CheckWork(pblock.get(), *pwalletMain, reservekey);
+        SetThreadPriority(THREAD_PRIORITY_LOWEST);
+
+      }
+
+    }
+
+    Sleep(1);
+  }
+  
+  return;
 }
 
 void static ThreadSlimcoinMiner(void* parg)

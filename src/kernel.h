@@ -5,6 +5,7 @@
 #define SMCOIN_KERNEL_H
 
 #include "main.h"
+#include "wallet.h"
 
 // MODIFIER_INTERVAL: time to elapse before new modifier is computed
 static const unsigned int MODIFIER_INTERVAL = 6 * 60 * 60;
@@ -26,7 +27,9 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64& nStakeModif
 
 // Check whether stake kernel meets hash target
 // Sets hashProofOfStake on success return
-bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned int nTxPrevOffset, const CTransaction& txPrev, const COutPoint& prevout, unsigned int nTimeTx, uint256& hashProofOfStake, bool fPrintProofOfStake=false);
+bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned int nTxPrevOffset, 
+                          const CTransaction& txPrev, const COutPoint& prevout, unsigned int nTimeTx,
+                          uint256& hashProofOfStake, bool fPrintProofOfStake=false);
 
 // Check kernel hash target and coinstake signature
 // Sets hashProofOfStake on success return
@@ -40,5 +43,25 @@ unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
 
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum);
+
+
+//////////////////////////////////////////////////////////////////////////////
+/*                              Proof Of Burn                               */
+//////////////////////////////////////////////////////////////////////////////
+
+//~ #define BURN_CONSTANT 10.0 * COIN
+
+//these numbers need to be doubles
+#define BURN_CONSTANT .01 * CENT
+#define BURN_HASH_DOUBLE 1000.0 //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
+
+extern const CBitcoinAddress burnOfficialAddress;
+extern const CBitcoinAddress burnTestnetAddress;
+
+//Scans all of the hashes of this transaction and returns the smallest one
+bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
+
+//Applies ScanBurnHashes to all of the burnt transactions stored in the mapBurnWallet
+std::pair<uint256, CWalletTx> HashAllBurntTx();
 
 #endif // SMCOIN_KERNEL_H

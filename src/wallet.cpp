@@ -327,7 +327,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fBurnTx)
     // Inserts only if not already there, returns tx inserted or tx found
     pair<map<uint256, CWalletTx>::iterator, bool> ret = mapWallet.insert(make_pair(hash, wtxIn));
 
-    //if it is a burn tx, add it to its map
+    //if it is a burn tx, add it to the wallet's its map
     if(fBurnTx)
       mapBurnWallet.insert(make_pair(hash, wtxIn));
 
@@ -1477,18 +1477,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, bool
         
         coin.BindWallet(this);
         coin.MarkSpent(txin.prevout.n);
-
-        //TODO: SEE if this is needed and find where the non-burn txs are automatically added!, also check main.h
-        // Stake blocks are thought to be PoW blocks
-
-        //segments with both !IsProofOfBurn() && !IsProofOfStake(); in IsPow, main.h CBlock. Works with !isPoS,
-        // check that out
-
-        //Also, a not, the listtransactions I commented and print the burntTransactions in map only
-        // Also, possible in CWallet::AddToWallet up to is the awesome code to check for adding
-        //  burnt tx's while the client is running
-
-        coin.WriteToDisk(fBurnTx);
+        coin.WriteToDisk();
 
         vWalletUpdated.push_back(coin.GetHash());
       }

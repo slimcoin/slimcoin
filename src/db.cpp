@@ -688,37 +688,13 @@ bool CTxDB::LoadBlockIndex()
     ///////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////
 
+    // THIS IS MY STUFF
+
     printf("Block %d has this many transactions in it: %d, Block Pos %d\n", 
            pindex->nHeight, block.vtx.size(), pindex->nBlockPos);
 
-    //~ printf("\t%d PoB payout is %s\n", pindex->nHeight, block.vtx[0].burnPayoutAddress.ToString().c_str());
-
-    //TODO: block 548 has a burned transaction of 25 coins, examine it
-    //639 has 14 burnt coins in it and also the burnPayoutAddress is supposed to be set
-    if(pindex->nHeight == 639 && true)
+    if(pindex->nHeight == 639 && false)
     {
-      //~ u32int test = 0;
-      //~ CTransaction testTrans;
-      //~ CBitcoinAddress printAddr;
-      //~ for(; test < block.vtx[2].vin.size(); test++)
-      //~ {
-        //~ printf("+++++++++++++++++++++++++++++++++++++++\n");
-        //~ block.vtx[2].vin[test].print();
-        //~ printf("---------------------------------------\n");
-
-        //~ CTxIn input = block.vtx[2].vin[test];
-
-        //~ //read and print the transaction
-        //~ testTrans.ReadFromDisk(input.prevout);
-
-        //~ //get the address
-        //~ ExtractAddress(testTrans.vout[input.prevout.n].scriptPubKey, printAddr);
-
-        //~ printf("To address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
-               //~ printAddr.ToString().c_str(), testTrans.vout[input.prevout.n].nValue / COIN);
-      //~ }
-
-      //~ printf("\tPoB payout is %s\n", block.vtx[0].burnPayoutAddress.ToString().c_str());
 
       CBitcoinAddress printAddr;
       block.vtx[2].GetSendersAddress(printAddr);      
@@ -733,6 +709,8 @@ bool CTxDB::LoadBlockIndex()
         printf("+++++++++++++++Some sort of ERROR\n");
       
     }
+
+    // THIS IS MY STUFF
 
     ///////////////////////////////////////////////////////////////////////////////
     ///////////////////////////////////////////////////////////////////////////////

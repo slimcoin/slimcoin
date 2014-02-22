@@ -1415,7 +1415,7 @@ void ThreadMessageHandler2(void* parg)
 }
 
 // slimcoin: stake minter thread
-void static ThreadStakeMinter(void* parg)
+void static ThreadStakeMinter(void *parg)
 {
   printf("ThreadStakeMinter started\n");
   CWallet* pwallet = (CWallet*)parg;
@@ -1432,7 +1432,32 @@ void static ThreadStakeMinter(void* parg)
     vnThreadsRunning[THREAD_MINTER]--;
     PrintException(NULL, "ThreadStakeMinter()");
   }
+
   printf("ThreadStakeMinter exiting, %d threads remaining\n", vnThreadsRunning[THREAD_MINTER]);
+  return;
+}
+
+// slimcoin: burn miner after coins were burnt
+void static ThreadAfterBurner(void *parg)
+{
+  printf("ThreadAfterBurner started\n");
+  CWallet* pwallet = (CWallet*)parg;
+  try
+  {
+    vnThreadsRunning[THREAD_BURNER]++;
+    SlimCoinAfterBurner(pwallet);
+    vnThreadsRunning[THREAD_BURNER]--;
+  }
+  catch (std::exception& e) {
+    vnThreadsRunning[THREAD_BURNER]--;
+    PrintException(&e, "ThreadAfterBurner()");
+  } catch (...) {
+    vnThreadsRunning[THREAD_BURNER]--;
+    PrintException(NULL, "ThreadAfterBurner()");
+  }
+
+  printf("ThreadAfterBurner exiting, %d threads remaining\n", vnThreadsRunning[THREAD_BURNER]);
+  return;
 }
 
 
@@ -1649,6 +1674,12 @@ void StartNode(void* parg)
   // slimcoin: mint proof-of-stake blocks in the background
   if(!CreateThread(ThreadStakeMinter, pwalletMain))
     printf("Error: CreateThread(ThreadStakeMinter) failed\n");
+
+  // slimcoin: hash proof-of-burn in the background
+  //~ if(!CreateThread(ThreadAfterBurner, pwalletMain))
+    //~ printf("Error: CreateThread(ThreadAfterBurner) failed\n");
+
+  return;
 }
 
 bool StopNode()
@@ -1671,6 +1702,7 @@ bool StopNode()
       break;
     Sleep(20);
   } while(true);
+
   if(vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) printf("ThreadSocketHandler still running\n");
   if(vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) printf("ThreadOpenConnections still running\n");
   if(vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) printf("ThreadMessageHandler still running\n");
@@ -1681,8 +1713,10 @@ bool StopNode()
   if(vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) printf("ThreadOpenAddedConnections still running\n");
   if(vnThreadsRunning[THREAD_DUMPADDRESS] > 0) printf("ThreadDumpAddresses still running\n");
   if(vnThreadsRunning[THREAD_MINTER] > 0) printf("ThreadStakeMinter still running\n");
+
   while(vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0 || vnThreadsRunning[THREAD_RPCSERVER] > 0)
     Sleep(20);
+
   Sleep(50);
   DumpAddresses();
   return true;

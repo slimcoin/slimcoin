@@ -105,7 +105,10 @@ public:
   }
 
   std::map<uint256, CWalletTx> mapWallet;
+
+  // A mapping for all burn transactions
   std::map<uint256, CWalletTx> mapBurnWallet;
+
   std::vector<uint256> vWalletUpdated;
 
   std::map<uint256, int> mapRequestCount;
@@ -609,6 +612,20 @@ CWalletTx(const CWallet* pwalletIn, const CTransaction& txIn) : CMerkleTx(txIn)
       }
     }
     return true;
+  }
+
+  void GetBurnTxCoords(s32int &blkHeightRet, s32int &txIndexRet, s32int &outTxIndexRet) const
+  {
+    std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(hashBlock);
+    if(it == mapBlockIndex.end())
+      blkHeightRet = -1;
+    else
+      blkHeightRet = it->second->nHeight;
+
+    txIndexRet = nIndex;
+    outTxIndexRet = GetBurnOutTxIndex();
+
+    return;
   }
 
   bool WriteToDisk(bool fBurnTx = false);

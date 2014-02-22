@@ -94,7 +94,9 @@ extern std::map<uint256, CBlock*> mapOrphanBlocks;
 // Settings
 extern int64 nTransactionFee;
 
-
+//PoB addresses defined in kernel.h
+extern const CBitcoinAddress burnOfficialAddress;
+extern const CBitcoinAddress burnTestnetAddress;
 
 
 
@@ -128,7 +130,9 @@ uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
 void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake);
 
-
+//PoB
+void SlimCoinAfterBurner(CWallet *pwallet);
+bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint256 &smallestHashRet);
 
 
 
@@ -586,7 +590,7 @@ public:
   }
 
   //Returns the address of the first txIn in addressRet
-  bool GetSendersAddress(CBitcoinAddress &addressRet)
+  bool GetSendersAddress(CBitcoinAddress &addressRet) const
   {
     if(vin.empty())
       return false;
@@ -601,6 +605,34 @@ public:
     //Extract the address from the indexed TxOut's scriptPubKey
     return ExtractAddress(prevTx.vout[input.prevout.n].scriptPubKey, addressRet);
   }
+
+  //return the index of a burn transaction in vout, -1 if not found
+  s32int GetBurnOutTxIndex() const
+  {
+    //find the burnt transaction
+    const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
+
+    if(!burnAddress.IsValid())
+    {
+      printf("CTransaction GetBurnTxIndex: Burn address is invalid");
+      return -1;
+    }
+
+    u32int i;
+    for(i = 0; i < vout.size(); i++)
+    {
+      CBitcoinAddress address;
+      if(!ExtractAddress(vout[i].scriptPubKey, address))
+        continue;
+
+      if(address == burnAddress)
+        break;
+    }
+
+    //if i hit the end for the for loop, it means it found nothing so return -1
+    return i == vout.size() ? -1 : i;
+  }
+  
 
   /** Amount of bitcoins coming in to this transaction
       Note that lightweight clients may not know anything besides the hash of previous transactions,
@@ -1002,6 +1034,18 @@ public:
     return Hash(BEGIN(nVersion), END(nNonce));
   }
 
+  uint256 GetBurnHash() const
+  {
+    if(!IsProofOfBurn())
+      return ~uint256(0);
+
+    uint256 hash;
+    if(!::GetBurnHash(burnBlkHeight, burnCTx, burnCTxOut, hash))
+      return ~uint256(0);
+
+    return hash;
+  }
+  
   int64 GetBlockTime() const
   {
     return (int64)nTime;
@@ -1033,19 +1077,12 @@ public:
 
   bool IsProofOfBurn() const
   {
-    //be sure it is not a PoS block and the burnIndexes are fine
-    printf("===========================================FPoB %d, Height %d, CTx %d, CTcOut %d, pos %d\n",
-           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut, IsProofOfStake());
     return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0;
   }
 
   bool IsProofOfWork() const
   {
-    //!IsProofOfStake is called in IsProofOfBurn, so no need to call it again
-
-    //TODO: Boy-oh-Boy, much segments
     return !IsProofOfBurn() && !IsProofOfStake();
-    //~ return !IsProofOfStake();
   }
 
   std::pair<COutPoint, unsigned int> GetProofOfStake() const
