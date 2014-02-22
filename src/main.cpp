@@ -491,9 +491,7 @@ bool CTransaction::CheckTransaction() const
       printf("SCRIPT size is %d\n", vin[0].scriptSig.size());
       return DoS(100, error("CTransaction::CheckTransaction() : coinbase script size"));
     }
-  }
-  else
-  {
+  }else{
     BOOST_FOREACH(const CTxIn& txin, vin)
       if(txin.prevout.IsNull())
         return DoS(10, error("CTransaction::CheckTransaction() : prevout is null"));
@@ -2175,7 +2173,7 @@ bool CBlock::SignBlock(const CKeyStore& keystore)
 {
   vector<valtype> vSolutions;
   txnouttype whichType;
-  const CTxOut& txout = IsProofOfStake()? vtx[1].vout[1] : vtx[0].vout[0];
+  const CTxOut& txout = IsProofOfStake() ? vtx[1].vout[1] : vtx[0].vout[0];
 
   if(!Solver(txout.scriptPubKey, whichType, vSolutions))
     return false;
@@ -4328,6 +4326,7 @@ void SlimCoinAfterBurner(CWallet *pwallet)
 
   // Each thread has its own key and counter
   CReserveKey reservekey(pwallet);
+  unsigned int nExtraNonce = 0;
   CBlockIndex *pindexLastBlock = NULL;
 
   for(;;)
@@ -4374,6 +4373,10 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       // Create new block
       //
       auto_ptr<CBlock> pblock(CreateNewBlock(pwallet));
+      if(!pblock.get())
+        return;
+
+      IncrementExtraNonce(pblock.get(), pindexLastBlock, nExtraNonce);
 
       uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
       if(smallestHash < hashTarget)
