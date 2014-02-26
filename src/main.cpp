@@ -3703,9 +3703,16 @@ bool HashBurnData(uint256 hashBlock, CTransaction &burnTx, CTxOut &burnTxOut, ui
   //get the boundaries for nTime
   u32int startTime, endTime;
 
+  //first of all, test if the best block is a PoW bloc
+  if(!pindexBest->IsProofOfWork())
+    return false;
+
   //go through the list untill we find a PoW pindex
   CBlockIndex *pindexLastPoW = pindexBest->pprev;
   for(; pindexLastPoW && !pindexLastPoW->IsProofOfWork(); pindexLastPoW = pindexLastPoW->pprev);
+
+  if(!pindexLastPoW)
+    return false;
 
   startTime = pindexLastPoW->nTime;
   endTime = pindexBest->nTime;
