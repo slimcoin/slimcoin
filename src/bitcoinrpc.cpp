@@ -117,6 +117,7 @@ HexBits(unsigned int nBits)
 void WalletTxToJSON(const CWalletTx& wtx, Object& entry)
 {
   int confirms = wtx.GetDepthInMainChain();
+
   entry.push_back(Pair("confirmations", confirms));
   if(confirms)
   {
@@ -961,12 +962,6 @@ Value burncoins(const Array& params, bool fHelp)
 
     tie(smallestHash, smallestWTx) = HashAllBurntTx();
 
-    //~ if(!ScanBurnHashes(pwalletMain->mapBurnWallet[uint256("efe0fd903d9b60b192bc6a547d4eff1c603381ccdd894b26bd71baa9e75b6c11")], smallestHash))
-    //~ {
-      //~ printf("=========asdasd NO GOOODDDD\n");
-      //~ return false;
-    //~ }
-
     printf("=============================Smallest Hash is this %s\n\tby tx %s\n", 
            smallestHash.ToString().c_str(), smallestWTx.GetHash().ToString().c_str());
     return true;
@@ -1453,12 +1448,13 @@ Value listtransactions(const Array& params, bool fHelp)
 
   // Note: maintaining indices in the database of (account,time) --> txid and (account, time) --> acentry
   // would make this much faster for applications that do this a lot.
-  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
-        it != pwalletMain->mapBurnWallet.end(); ++it)
+  for(set<uint256>::iterator it = pwalletMain->setBurnHashes.begin(); 
+        it != pwalletMain->setBurnHashes.end(); ++it)
   //~ for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); 
         //~ it != pwalletMain->mapWallet.end(); ++it)
   {
-    CWalletTx* wtx = &((*it).second);
+    CWalletTx* wtx = &(pwalletMain->mapWallet.at(*it));
+    //~ CWalletTx* wtx = &(it->second);
     txByTime.insert(make_pair(wtx->GetTxTime(), TxPair(wtx, (CAccountingEntry*)0)));
   }
   list<CAccountingEntry> acentries;

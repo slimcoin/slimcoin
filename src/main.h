@@ -26,6 +26,8 @@ class CBlockIndex;
 class CKeyItem;
 class CReserveKey;
 class COutPoint;
+class CTransaction;
+class CTxOut;
 
 class CAddress;
 class CInv;
@@ -133,6 +135,7 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake);
 
 //PoB
 void SlimCoinAfterBurner(CWallet *pwallet);
+bool HashBurnData(uint256 hashBlock, CTransaction &burnTx, CTxOut &burnTxOut, uint256 &smallestHashRet);
 bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint256 &smallestHashRet);
 
 
@@ -1375,6 +1378,8 @@ public:
     burnBlkHeight  = block.burnBlkHeight;
     burnCTx        = block.burnCTx;
     burnCTxOut     = block.burnCTxOut;
+
+    printf("WASSSS ZIPPP %d %d %d %d\n", fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
   }
 
   CBlock GetBlockHeader() const
@@ -1418,10 +1423,16 @@ public:
 
   bool CheckIndex() const
   {
+    printf("------------------------------- %d %d %d %d %d %d %d\n",
+           IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
+    return true;
+
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
     else if(IsProofOfBurn())
     {
+      printf("+++++++++++++++++++++++++\n");
+
       uint256 burnHash;
       GetBurnHash(burnBlkHeight, burnCTx, burnCTxOut, burnHash);
       return CheckProofOfBurn(burnHash, nBits);

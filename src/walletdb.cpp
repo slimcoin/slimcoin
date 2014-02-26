@@ -106,7 +106,6 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
   pcursor->close();
 }
 
-
 int CWalletDB::LoadWallet(CWallet* pwallet)
 {
   pwallet->vchDefaultKey.clear();
@@ -194,11 +193,14 @@ int CWalletDB::LoadWallet(CWallet* pwallet)
         //    DateTimeStrFormat(wtx.GetBlockTime()).c_str(),
         //    wtx.hashBlock.ToString().substr(0,20).c_str(),
         //    wtx.mapValue["message"].c_str());
-      }else if(strType == "burnTx")
+      }else if(strType == "burnHash")
       {
         uint256 hash;
         ssKey >> hash;
-        CWalletTx& wtx = pwallet->mapBurnWallet[hash];
+        pwallet->setBurnHashes.insert(hash);
+
+        CWalletTx wtx;
+        //check if the hash matches a transaction and is not fake
         ssValue >> wtx;
         wtx.BindWallet(pwallet);
 

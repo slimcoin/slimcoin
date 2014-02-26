@@ -1676,8 +1676,8 @@ void StartNode(void* parg)
     printf("Error: CreateThread(ThreadStakeMinter) failed\n");
 
   // slimcoin: hash proof-of-burn in the background
-  if(!CreateThread(ThreadAfterBurner, pwalletMain))
-    printf("Error: CreateThread(ThreadAfterBurner) failed\n");
+  //~ if(!CreateThread(ThreadAfterBurner, pwalletMain))
+    //~ printf("Error: CreateThread(ThreadAfterBurner) failed\n");
 
   return;
 }

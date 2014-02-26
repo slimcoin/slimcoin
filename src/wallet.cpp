@@ -329,7 +329,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fBurnTx)
 
     //if it is a burn tx, add it to the wallet's its map
     if(fBurnTx)
-      mapBurnWallet.insert(make_pair(hash, wtxIn));
+      setBurnHashes.insert(hash);
 
     CWalletTx& wtx = (*ret.first).second;
     wtx.BindWallet(this);
@@ -361,7 +361,8 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fBurnTx)
     }
 
     //// debug print
-    printf("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString().substr(0,10).c_str(), (fInsertedNew ? "new" : ""), (fUpdated ? "update" : ""));
+    printf("AddToWallet %s  %s%s\n", wtxIn.GetHash().ToString().substr(0,10).c_str(),
+           (fInsertedNew ? "new" : ""), (fUpdated ? "update" : ""));
 
     // Write to disk
     if(fInsertedNew || fUpdated)
@@ -394,6 +395,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fBurnTx)
 
   // Refresh UI
   MainFrameRepaint();
+
   return true;
 }
 
@@ -1499,6 +1501,7 @@ bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, bool
     wtxNew.RelayWalletTransaction();
   }
   MainFrameRepaint();
+
   return true;
 }
 

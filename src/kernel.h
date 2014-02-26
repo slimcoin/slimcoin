@@ -61,7 +61,7 @@ extern const CBitcoinAddress burnTestnetAddress;
 //Scans all of the hashes of this transaction and returns the smallest one
 bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
 
-//Applies ScanBurnHashes to all of the burnt transactions stored in the mapBurnWallet
+//Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
 std::pair<uint256, CWalletTx> HashAllBurntTx();
 
 #endif // SMCOIN_KERNEL_H

@@ -984,6 +984,8 @@ bool CheckProofOfBurn(uint256 hash, unsigned int nBits)
   CBigNum bnTarget;
   bnTarget.SetCompact(nBits);
 
+  printf("00000000000 Hash: %s Target: %s\n", hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());
+
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
     return error("CheckProofOfBurn() : nBits below minimum work");
@@ -1803,6 +1805,13 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 
 //MYTODO: Check this out, need to add IsPoB in pindex, CheckIndex is executed in CTxDB::LoadBlockIndex, 
 // what cause problems is main.h::1422
+//
+//Yeah, big dodo, ummm.. where to start. Fix the pindex to record to disk the PoB blocks, it does not do that
+// I added a premature return true; there to pass the loading process, or else the client would not start
+// Also, check what is up with that times of blocks being well the same, probably uses a burn block being made 
+// directly after a PoW block, actually, in the GetBurnHash and the hash calculator, change from pprevBest and pBest
+// to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), CheckBlock(), CBlockIndex(), etc
+
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
   // Check for duplicate
@@ -2021,6 +2030,7 @@ bool CBlock::AcceptBlock()
   unsigned int nBlockPos = 0;
   if(!WriteToDisk(nFile, nBlockPos))
     return error("AcceptBlock() : WriteToDisk failed");
+
   if(!AddToBlockIndex(nFile, nBlockPos))
     return error("AcceptBlock() : AddToBlockIndex failed");
 
@@ -2136,6 +2146,8 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     }
     return true;
   }
+
+  printf("DDDDDDDDDDDDDDDDDDDDDD\n");
 
   // Store to disk
   if(!pblock->AcceptBlock())
@@ -3107,6 +3119,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     if(tx.AcceptToMemoryPool(txdb, true, &fMissingInputs))
     {
       SyncWithWallets(tx, NULL, true);
+
       RelayMessage(inv, vMsg);
       mapAlreadyAskedFor.erase(inv);
       vWorkQueue.push_back(inv.hash);
@@ -3685,6 +3698,68 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
   return (u32int) -1;
 }
 
+bool HashBurnData(uint256 hashBlock, CTransaction &burnTx, CTxOut &burnTxOut, uint256 &smallestHashRet)
+{
+  //get the boundaries for nTime
+  u32int startTime, endTime;
+
+  //go through the list untill we find a PoW pindex
+  CBlockIndex *pindexLastPoW = pindexBest->pprev;
+  for(; pindexLastPoW && !pindexLastPoW->IsProofOfWork(); pindexLastPoW = pindexLastPoW->pprev);
+
+  startTime = pindexLastPoW->nTime;
+  endTime = pindexBest->nTime;
+
+  printf("++++++%s\n++++++%s\n", 
+         pindexLastPoW->GetBlockHash().ToString().c_str(), pindexBest->GetBlockHash().ToString().c_str());
+
+  //this should not be possible!
+  if(startTime >= endTime)
+    return error("GetBurnHash(): Search start time (%d) should be less than the end time (%d)", 
+                 startTime, endTime);
+
+  //May trigger if the network was down for a while and no new blocks were being found
+  if(endTime - startTime > nTargetSpacingWorkMax)
+    return error("GetBurnHash(): Search time gap too large %d > blockTimeMax", endTime - startTime);
+
+  u32int last_nHeight, burned_nHeight;
+  last_nHeight = pindexBest->nHeight;
+  burned_nHeight = mapBlockIndex[hashBlock]->nHeight;
+
+  //calculate the multiplier for the hash
+  const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
+    pow(2, (last_nHeight - burned_nHeight) / BURN_HASH_DOUBLE);
+
+  //the largest value a uint256 can store
+  const CBigNum bnMax(~uint256(0));
+  CBigNum bnTest;
+
+  //start off the smallest hash the absolute biggest it can be
+  smallestHashRet = ~uint256(0);
+
+  // Calculate hash going backwards
+  u32int i;
+  for(i = endTime; i > startTime; i--)
+  {
+    //package the data to be hashed and hash
+    CDataStream ss(SER_GETHASH, 0);
+    ss << hashBlock << burnTx.GetHash() << i;
+    CBigNum bnHash(Hash(ss.begin(), ss.end()));
+    
+    //apply the multiplier
+    bnTest = bnHash * multiplier;
+
+    //if bignum test is too big to fir in a uint256, continue
+    if(bnTest > bnMax)
+      continue;
+
+    if(bnTest < CBigNum(smallestHashRet))
+      smallestHashRet = bnTest.getuint256();
+  }
+
+  return true;
+}
+
 //Gets the hash for PoB given only the indexes
 bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint256 &smallestHashRet)
 {
@@ -3737,52 +3812,8 @@ bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint25
   if(!burnTxOut.nValue)
     return error("GetBurnHash(): Burn transaction's value is 0");
 
-  //get the boundaries for nTime
-  u32int startTime, endTime;
-  startTime = pindexBest->pprev->nTime;
-  endTime = pindexBest->nTime;
-
-  //this should not be possible!
-  if(startTime >= endTime)
-    return error("GetBurnHash(): Search start time should be less than the end time");
-
-  u32int last_nHeight, burned_nHeight;
-  last_nHeight = pindexBest->nHeight;
-  burned_nHeight = mapBlockIndex[hashBlock]->nHeight;
-
-  //calculate the multiplier for the hash
-  const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
-    pow(2, (last_nHeight - burned_nHeight) / BURN_HASH_DOUBLE);
-
-  //the largest value a uint256 can store
-  const CBigNum bnMax(~uint256(0));
-  CBigNum bnTest;
-
-  //start off the smallest hash the absolute biggest it can be
-  smallestHashRet = ~uint256(0);
-
-  // Calculate hash going backwards
-  u32int i;
-  for(i = endTime; i > startTime; i--)
-  {
-    //package the data to be hashed and hash
-    CDataStream ss(SER_GETHASH, 0);
-    ss << hashBlock << burnTx.GetHash() << i;
-    CBigNum bnHash(Hash(ss.begin(), ss.end()));
-    
-    //apply the multiplier
-    bnTest = bnHash * multiplier;
-
-    //if bignum test is too big to fir in a uint256, continue
-    if(bnTest > bnMax)
-      continue;
-
-    if(bnTest < CBigNum(smallestHashRet))
-      smallestHashRet = bnTest.getuint256();
-  }
-
   //sucess!
-  return true;
+  return HashBurnData(hashBlock, burnTx, burnTxOut, smallestHashRet);
 }
 
 // Some explaining would be appreciated
@@ -4359,6 +4390,8 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       uint256 smallestHash;
       CWalletTx smallestWTx;
       tie(smallestHash, smallestWTx) = HashAllBurntTx();
+
+      printf("Hash block %s %s\n", smallestWTx.hashBlock.ToString().c_str(), smallestHash.ToString().c_str());
 
       if(!smallestWTx.hashBlock)
         continue;

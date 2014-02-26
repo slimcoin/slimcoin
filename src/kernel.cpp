@@ -495,49 +495,8 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
   if(!burnTxOut.nValue)
     return error("ScanBurnHashes: Burn transaction's value is 0");
 
-  //get the boundaries for nTime
-  u32int startTime, endTime;
-  startTime = pindexBest->pprev->nTime;
-  endTime = pindexBest->nTime;
-
-  //this should not be possible!
-  if(startTime >= endTime)
-    return error("ScanBurnHashes: Search start time should be less than the end time");
-
-  u32int last_nHeight, burned_nHeight;
-  last_nHeight = pindexBest->nHeight;
-  burned_nHeight = mapBlockIndex[burnWTx.hashBlock]->nHeight;
-
-  //calculate the multiplier for the hash
-  const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
-    pow(2, (last_nHeight - burned_nHeight) / BURN_HASH_DOUBLE);
-
-  //the largest value a uint256 can store
-  const CBigNum bnMax(~uint256(0));
-  CBigNum bnTest;
-
-  // Calculate hash going backwards
-  u32int i;
-  for(i = endTime; i > startTime; i--)
-  {
-    //package the data to be hashed and hash
-    CDataStream ss(SER_GETHASH, 0);
-    ss << burnWTx.hashBlock << burnWTx.GetHash() << i;
-    CBigNum bnHash(Hash(ss.begin(), ss.end()));
-    
-    //apply the multiplier
-    bnTest = bnHash * multiplier;
-
-    //if bignum test is too big to fir in a uint256, continue
-    if(bnTest > bnMax)
-      continue;
-
-    if(bnTest < CBigNum(smallestHashRet))
-      smallestHashRet = bnTest.getuint256();
-  }
-
   //success!
-  return true;
+  return HashBurnData(burnWTx.hashBlock, (CTransaction&)burnWTx, burnTxOut, smallestHashRet);
 }
 
 std::pair<uint256, CWalletTx> HashAllBurntTx()
@@ -546,12 +505,12 @@ std::pair<uint256, CWalletTx> HashAllBurntTx()
   uint256 smallestHash(~uint256(0));
   CWalletTx smallestWTx;
 
-  //go through all of the burnt transactions in the mapBurnWallet
-  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapBurnWallet.begin(); 
-      it != pwalletMain->mapBurnWallet.end(); ++it)
+  //go through all of the burnt hashes in the setBurnHashes
+  for(set<uint256>::iterator it = pwalletMain->setBurnHashes.begin(); 
+      it != pwalletMain->setBurnHashes.end(); ++it)
   {
-    CWalletTx tmpWTx = it->second;
-    //~ printf("=============%s\n", tmpWTx.GetHash().ToString().c_str());
+    CWalletTx tmpWTx = pwalletMain->mapWallet.at(*it);
+    printf("=============%s\n", tmpWTx.GetHash().ToString().c_str());
     u32int confirms = tmpWTx.GetDepthInMainChain();
     if(!confirms) //a transaction hash to have atleast some confirmations
       continue;

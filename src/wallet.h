@@ -106,8 +106,8 @@ public:
 
   std::map<uint256, CWalletTx> mapWallet;
 
-  // A mapping for all burn transactions
-  std::map<uint256, CWalletTx> mapBurnWallet;
+  // An array for all burn transactions' hashes
+  std::set<uint256> setBurnHashes;
 
   std::vector<uint256> vWalletUpdated;
 
