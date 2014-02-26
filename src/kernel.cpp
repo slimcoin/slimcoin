@@ -449,12 +449,11 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
    *        E = BURN_HASH_DOUBLE, an exponential constant which causes 
    *                                   burnt coins to produce slightly larger hashes as time passes
    *
-   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ nTime)
+   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestPoWBlock ++ iterator)
    *        Where: burntBlockHash = the hash of the block the transaction is found ing
    *               burnTx.GetHash() = the hash of this transaction
-   *               nTime = an integer 'x' where prevprevBlock.nTime < x <= prevBlock.nTime
-   *               Where: prevprevBlock = the block before the last block in the chain
-   *                      prevBlock = the last block in the chain
+   *               hashBestBlock = the hash of the best Proof of Work block in the chain at the time of hashing
+   *               iterator = an integer 'x' where 0 <= x < BURN_HASH_CONSTANT
    */
 
   //check if the wallet transaction has a block hash connected to it
@@ -496,7 +495,7 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
     return error("ScanBurnHashes: Burn transaction's value is 0");
 
   //success!
-  return HashBurnData(burnWTx.hashBlock, (CTransaction&)burnWTx, burnTxOut, smallestHashRet);
+  return HashBurnData(burnWTx.hashBlock, pindexBest->nHeight, (CTransaction&)burnWTx, burnTxOut, smallestHashRet);
 }
 
 std::pair<uint256, CWalletTx> HashAllBurntTx()

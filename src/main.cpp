@@ -984,7 +984,8 @@ bool CheckProofOfBurn(uint256 hash, unsigned int nBits)
   CBigNum bnTarget;
   bnTarget.SetCompact(nBits);
 
-  printf("00000000000 Hash: %s Target: %s\n", hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());
+  printf("00000000000 Check PoB Hash: %s Target: %s\n", 
+         hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());
 
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
@@ -1811,6 +1812,10 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 // Also, check what is up with that times of blocks being well the same, probably uses a burn block being made 
 // directly after a PoW block, actually, in the GetBurnHash and the hash calculator, change from pprevBest and pBest
 // to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), CheckBlock(), CBlockIndex(), etc
+//
+//!!!!BIG!!!!
+//Well ... I have to add a lask_nHeight to each block since I cannot use pindexBest when validating best blocks
+// I also took out the hash block->nTime --> prevBlock->nTime and set a constant there, I think it makes things easier
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -3698,44 +3703,29 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
   return (u32int) -1;
 }
 
-bool HashBurnData(uint256 hashBlock, CTransaction &burnTx, CTxOut &burnTxOut, uint256 &smallestHashRet)
+bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
+                  CTxOut &burnTxOut, uint256 &smallestHashRet)
 {
-  //get the boundaries for nTime
-  u32int startTime, endTime;
+  s32int burned_nHeight;
+  burned_nHeight = mapBlockIndex[burnHashBlock]->nHeight;
 
-  //first of all, test if the best block is a PoW bloc
-  if(!pindexBest->IsProofOfWork())
-    return false;
+  //the burn transaction must meet the minimum number of confirmations
+  if(lastBlkHeight - burned_nHeight < BURN_MIN_CONFIRMS)
+    return error("HashBurnData(): Burn transaction does not meet minimum number of confirmations %d < %d", 
+                 lastBlkHeight - burned_nHeight, BURN_MIN_CONFIRMS);
 
-  //go through the list untill we find a PoW pindex
-  CBlockIndex *pindexLastPoW = pindexBest->pprev;
-  for(; pindexLastPoW && !pindexLastPoW->IsProofOfWork(); pindexLastPoW = pindexLastPoW->pprev);
+  //Get the block index for lastBlkHeight
+  CBlockIndex *pindexLast;
+  for(pindexLast = pindexBest; pindexLast && pindexLast->pprev; pindexLast = pindexLast->pprev)
+    if(pindexLast->nHeight == lastBlkHeight)
+      break;
 
-  if(!pindexLastPoW)
-    return false;
-
-  startTime = pindexLastPoW->nTime;
-  endTime = pindexBest->nTime;
-
-  printf("++++++%s\n++++++%s\n", 
-         pindexLastPoW->GetBlockHash().ToString().c_str(), pindexBest->GetBlockHash().ToString().c_str());
-
-  //this should not be possible!
-  if(startTime >= endTime)
-    return error("GetBurnHash(): Search start time (%d) should be less than the end time (%d)", 
-                 startTime, endTime);
-
-  //May trigger if the network was down for a while and no new blocks were being found
-  if(endTime - startTime > nTargetSpacingWorkMax)
-    return error("GetBurnHash(): Search time gap too large %d > blockTimeMax", endTime - startTime);
-
-  u32int last_nHeight, burned_nHeight;
-  last_nHeight = pindexBest->nHeight;
-  burned_nHeight = mapBlockIndex[hashBlock]->nHeight;
+  if(!pindexLast || !pindexLast->pprev || !pindexLast->GetBlockHash())
+    return error("HashBurnData(): Block Height %d not found in block indexes or is not valid", lastBlkHeight);
 
   //calculate the multiplier for the hash
   const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
-    pow(2, (last_nHeight - burned_nHeight) / BURN_HASH_DOUBLE);
+    pow(2, (lastBlkHeight - burned_nHeight - 1) / BURN_HASH_DOUBLE);
 
   //the largest value a uint256 can store
   const CBigNum bnMax(~uint256(0));
@@ -3744,13 +3734,13 @@ bool HashBurnData(uint256 hashBlock, CTransaction &burnTx, CTxOut &burnTxOut, ui
   //start off the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
 
-  // Calculate hash going backwards
+  // Calculate hashes
   u32int i;
-  for(i = endTime; i > startTime; i--)
+  for(i = 0; i < BURN_HASH_COUNT; i--)
   {
     //package the data to be hashed and hash
     CDataStream ss(SER_GETHASH, 0);
-    ss << hashBlock << burnTx.GetHash() << i;
+    ss << burnHashBlock << burnTx.GetHash() << pindexLast->GetBlockHash() << i;
     CBigNum bnHash(Hash(ss.begin(), ss.end()));
     
     //apply the multiplier
@@ -3764,14 +3754,17 @@ bool HashBurnData(uint256 hashBlock, CTransaction &burnTx, CTxOut &burnTxOut, ui
       smallestHashRet = bnTest.getuint256();
   }
 
+  //sucess!
   return true;
 }
 
 //Gets the hash for PoB given only the indexes
-bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint256 &smallestHashRet)
+bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
+                 s32int burnCTxOut, uint256 &smallestHashRet)
 {
-  if(burnBlkHeight < 0 || burnCTx < 0 || burnCTxOut < 0)
-    return error("GetBurnHash(): Input indexes are invalid %d:%d:%d\n", burnBlkHeight, burnCTx, burnCTxOut);
+  if(lastBlkHeight < 0 || burnBlkHeight < 0 || burnCTx < 0 || burnCTxOut < 0)
+    return error("GetBurnHash(): Input indexes are invalid %d:%d:%d:%d\n", 
+                 lastBlkHeight, burnBlkHeight, burnCTx, burnCTxOut);
 
   //Get the block index by burnBlkHeight
   CBlockIndex *pindex;
@@ -3820,8 +3813,17 @@ bool GetBurnHash(s32int burnBlkHeight, s32int burnCTx, s32int burnCTxOut, uint25
     return error("GetBurnHash(): Burn transaction's value is 0");
 
   //sucess!
-  return HashBurnData(hashBlock, burnTx, burnTxOut, smallestHashRet);
+  return HashBurnData(hashBlock, lastBlkHeight, burnTx, burnTxOut, smallestHashRet);
 }
+
+//Gets the hash for PoB given only the indexes and a lastBlockHash
+bool GetBurnHash(uint256 lastHashBlock, s32int burnBlkHeight, s32int burnCTx,
+                 s32int burnCTxOut, uint256 &smallestHashRet)
+{
+  s32int last_nHeight = mapBlockIndex[lastHashBlock]->nHeight;  
+  return GetBurnHash(last_nHeight, burnBlkHeight, burnCTx, burnCTxOut, smallestHashRet);
+}
+
 
 // Some explaining would be appreciated
 class COrphan
@@ -4406,8 +4408,7 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       printf("=============================Smallest Hash is this %s\n\tby tx %s\n", 
              smallestHash.ToString().c_str(), smallestWTx.GetHash().ToString().c_str());
 
-      //TODO: Now take this and ... make a function that returns these 3 values as a tuple and make a way to create a block
-      printf("\tBlock height %d, transaction depth %d, vout depth %d\n", 
+      printf("\t============Block height %d, transaction depth %d, vout depth %d\n", 
              mapBlockIndex.at(smallestWTx.hashBlock)->nHeight, 
              smallestWTx.nIndex, smallestWTx.GetBurnOutTxIndex());
 
@@ -4430,7 +4431,11 @@ void SlimCoinAfterBurner(CWallet *pwallet)
         smallestWTx.GetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
 
         uint256 hasher;
-        GetBurnHash(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
+        GetBurnHash(pblock->GetHash(), pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
+
+        if(hasher != smallestHash)
+          continue;
+
         printf("WOW such hash %s\n", hasher.ToString().c_str());
 
         //TODO: CTransaction errors out when processing a block, no good, at main.cpp :: 491

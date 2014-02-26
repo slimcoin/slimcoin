@@ -52,8 +52,10 @@ bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierCheck
 //~ #define BURN_CONSTANT 10.0 * COIN
 
 //these numbers need to be doubles
-#define BURN_CONSTANT .01 * CENT
-#define BURN_HASH_DOUBLE 1000.0 //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
+#define BURN_CONSTANT     .01 * CENT
+#define BURN_HASH_DOUBLE  1000.0  //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
+#define BURN_HASH_COUNT   1000    //the amount of hashes to be done when getting the smallest hash
+#define BURN_MIN_CONFIRMS 1       //a burn transaction requires atleast 1 confimation
 
 extern const CBitcoinAddress burnOfficialAddress;
 extern const CBitcoinAddress burnTestnetAddress;

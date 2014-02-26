@@ -65,12 +65,10 @@ void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz,
     //if extend_array->array has already been malloc'd
     if(times_realloced)
     {
-      printf("IP\n");
       //reallocate on an exponential curve, modern computers have plenty ram
       actual_array_sz += pow(2, times_realloced++) * REALLOC_BASE_SZ;
       extend_array->array = (uint8_t*)realloc(extend_array->array, actual_array_sz);
-    }else
-    {
+    }else{
       //allocate the base size
       actual_array_sz += REALLOC_BASE_SZ;
       times_realloced++;
