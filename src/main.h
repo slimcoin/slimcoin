@@ -139,7 +139,7 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
                   CTxOut &burnTxOut, uint256 &smallestHashRet);
 bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet);
-bool GetBurnHash(uint256 lastHashBlock, s32int burnBlkHeight, s32int burnCTx,
+bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet);
 
 
@@ -1048,7 +1048,7 @@ public:
       return ~uint256(0);
 
     uint256 hash;
-    if(!::GetBurnHash(GetHash(), burnBlkHeight, burnCTx, burnCTxOut, hash))
+    if(!::GetBurnHash(hashPrevBlock, burnBlkHeight, burnCTx, burnCTxOut, hash))
       return ~uint256(0);
 
     return hash;

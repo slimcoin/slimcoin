@@ -1896,7 +1896,9 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 }
 
 
-
+//TODO i know why it segments, CBlock::GetHash() is not yet in the pindex
+// In the GetBurnHash, the lower (shorter) one, take out the -1
+// Check the CBlock::GetBurnHash() block hash of the last block, or even better, its index
 
 bool CBlock::CheckBlock() const
 {
@@ -2151,8 +2153,6 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
     }
     return true;
   }
-
-  printf("DDDDDDDDDDDDDDDDDDDDDD\n");
 
   // Store to disk
   if(!pblock->AcceptBlock())
@@ -3706,6 +3706,9 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
 bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
                   CTxOut &burnTxOut, uint256 &smallestHashRet)
 {
+  if(!mapBlockIndex.count(burnHashBlock))
+    return error("GetBurnHash(): Block hash %s not found in mapBlockIndex", burnHashBlock);
+
   s32int burned_nHeight;
   burned_nHeight = mapBlockIndex[burnHashBlock]->nHeight;
 
@@ -3816,11 +3819,17 @@ bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
   return HashBurnData(hashBlock, lastBlkHeight, burnTx, burnTxOut, smallestHashRet);
 }
 
-//Gets the hash for PoB given only the indexes and a lastBlockHash
-bool GetBurnHash(uint256 lastHashBlock, s32int burnBlkHeight, s32int burnCTx,
+//Gets the hash for PoB given only the indexes and a hashBlock, the best block at the time
+// hashBlock is usually pblock->hashPrevBlock when creating pblock since the previous is the best accepted block
+bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet)
 {
-  s32int last_nHeight = mapBlockIndex[lastHashBlock]->nHeight;  
+  //the hashBlock must appear in the mapBlockIndex
+  if(!mapBlockIndex.count(hashBlock))
+    return error("GetBurnHash(): Block hash %s not found in mapBlockIndex", hashBlock.ToString().c_str());
+
+  s32int last_nHeight = mapBlockIndex[hashBlock]->nHeight;  
+
   return GetBurnHash(last_nHeight, burnBlkHeight, burnCTx, burnCTxOut, smallestHashRet);
 }
 
@@ -4431,7 +4440,7 @@ void SlimCoinAfterBurner(CWallet *pwallet)
         smallestWTx.GetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
 
         uint256 hasher;
-        GetBurnHash(pblock->GetHash(), pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
+        GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
 
         if(hasher != smallestHash)
           continue;
