@@ -449,10 +449,11 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
    *        E = BURN_HASH_DOUBLE, an exponential constant which causes 
    *                                   burnt coins to produce slightly larger hashes as time passes
    *
-   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestPoWBlock ++ iterator)
+   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestBlock ++ bestNHeight ++ iterator)
    *        Where: burntBlockHash = the hash of the block the transaction is found ing
    *               burnTx.GetHash() = the hash of this transaction
-   *               hashBestBlock = the hash of the best Proof of Work block in the chain at the time of hashing
+   *               hashBestBlock = the hash of the best non-proof-of-burn block in the chain at the time of hashing
+   *               bestNHeight = the height of the best non-proof-of-burn block in the chain at the time of hashing
    *               iterator = an integer 'x' where 0 <= x < BURN_HASH_CONSTANT
    */
 
@@ -507,6 +508,10 @@ std::pair<uint256, CWalletTx> HashAllBurntTx()
   //give the smallest hash the absolute largest value it can hold
   uint256 smallestHash(~uint256(0));
   CWalletTx smallestWTx;
+
+  //if the best index is a proof-of-burn index, do not bother hashing as it will throw errors
+  if(pindexBest->IsProofOfBurn())
+    return make_pair(smallestHash, smallestWTx);
 
   //go through all of the burnt hashes in the setBurnHashes
   for(set<uint256>::iterator it = pwalletMain->setBurnHashes.begin(); 

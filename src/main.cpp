@@ -1809,8 +1809,13 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //Yeah, big dodo, ummm.. where to start. Fix the pindex to record to disk the PoB blocks, it does not do that
 // I added a premature return true; there to pass the loading process, or else the client would not start
 //
-// to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), CBlockIndex()/CDiskBlockIndex(), etc
+// to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), 
+// CBlockIndex()/CDiskBlockIndex(), etc
 //
+//DO FIRST:
+//
+//When there is a massive burn, it finds a block and then finds another block and then another entering a
+// recursive loop, somehow limit this. Also, the mining of PoB blocks apperently affects the difficulty
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -3704,12 +3709,12 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
                   CTxOut &burnTxOut, uint256 &smallestHashRet)
 {
   if(!mapBlockIndex.count(burnHashBlock))
-    return error("GetBurnHash(): Block hash %s not found in mapBlockIndex", burnHashBlock);
+    return error("HashBurnData(): Block hash %s not found in mapBlockIndex", burnHashBlock);
 
-  s32int burned_nHeight;
-  burned_nHeight = mapBlockIndex[burnHashBlock]->nHeight;
+  const s32int burned_nHeight = mapBlockIndex[burnHashBlock]->nHeight;
 
   //the burn transaction must meet the minimum number of confirmations
+  // uses a < because lastBlkHeigh is the index of the last block, ie) -1 takes care of the need for <=
   if(lastBlkHeight - burned_nHeight < BURN_MIN_CONFIRMS)
     return error("HashBurnData(): Burn transaction does not meet minimum number of confirmations %d < %d", 
                  lastBlkHeight - burned_nHeight, BURN_MIN_CONFIRMS);
@@ -3722,6 +3727,10 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
 
   if(!pindexLast || !pindexLast->pprev || !pindexLast->GetBlockHash())
     return error("HashBurnData(): Block Height %d not found in block indexes or is not valid", lastBlkHeight);
+
+  //the last block index cannot be a proof-of-burn
+  if(pindexLast->IsProofOfBurn())
+    return error("HashBurnData(): pindexLast is a proof-of-burn index");
 
   //calculate the multiplier for the hash
   const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
@@ -3740,7 +3749,7 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
   {
     //package the data to be hashed and hash
     CDataStream ss(SER_GETHASH, 0);
-    ss << burnHashBlock << burnTx.GetHash() << pindexLast->GetBlockHash() << i;
+    ss << burnHashBlock << burnTx.GetHash() << pindexLast->GetBlockHash() << pindexLast->nHeight << i;
     CBigNum bnHash(Hash(ss.begin(), ss.end()));
     
     //apply the multiplier

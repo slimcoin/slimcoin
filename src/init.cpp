@@ -302,7 +302,10 @@ bool AppInit2(int argc, char* argv[])
 #if !defined(QT_GUI)
   fServer = true;
 #endif
+
+#if !DEBUG_INIT
   fPrintToConsole = GetBoolArg("-printtoconsole");
+#endif
   fPrintToDebugger = GetBoolArg("-printtodebugger");
   fLogTimestamps = GetBoolArg("-logtimestamps");
 
