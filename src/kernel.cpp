@@ -456,6 +456,10 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
    *               iterator = an integer 'x' where 0 <= x < BURN_HASH_CONSTANT
    */
 
+  //check if the transaction is old enough
+  if(burnWTx.GetDepthInMainChain() <= BURN_MIN_CONFIRMS)
+    return false;
+
   //check if the wallet transaction has a block hash connected to it
   if(!burnWTx.hashBlock)
     return error("ScanBurnHashes: burnWtx.hashBlock == 0, the transaction has %d confirmations", 

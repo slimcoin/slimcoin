@@ -471,6 +471,8 @@ bool CTxDB::ReadDiskTx(COutPoint outpoint, CTransaction& tx)
 
 bool CTxDB::WriteBlockIndex(const CDiskBlockIndex& blockindex)
 {
+  printf("WASSSS ZIPPP %d %d %d %d\n", 
+         blockindex.fProofOfBurn, blockindex.burnBlkHeight, blockindex.burnCTx, blockindex.burnCTxOut);
   return Write(make_pair(string("blockindex"), blockindex.GetBlockHash()), blockindex);
 }
 
@@ -693,22 +695,6 @@ bool CTxDB::LoadBlockIndex()
     printf("Block %d has this many transactions in it: %d, Block Pos %d\n", 
            pindex->nHeight, block.vtx.size(), pindex->nBlockPos);
 
-    if(pindex->nHeight == 639 && false)
-    {
-
-      CBitcoinAddress printAddr;
-      block.vtx[2].GetSendersAddress(printAddr);      
-      printf("To address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
-             printAddr.ToString().c_str(), 0);
-
-      //Testnet Burn address is: mmSLiMCoinTestnetBurnAddresscVtB16
-      if(ExtractAddress(block.vtx[2].vout[1].scriptPubKey, printAddr))
-        printf("\tTo address found: %s\n\tTransaction nValue %"PRI64d" coins\n", 
-               printAddr.ToString().c_str(), block.vtx[2].vout[1].nValue / COIN);
-      else
-        printf("+++++++++++++++Some sort of ERROR\n");
-      
-    }
 
     // THIS IS MY STUFF
 

@@ -1804,18 +1804,13 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
   return true;
 }
 
-//MYTODO: Check this out, need to add IsPoB in pindex, CheckIndex is executed in CTxDB::LoadBlockIndex, 
-// what cause problems is main.h::1422
+//MYTODO: 
 //
 //Yeah, big dodo, ummm.. where to start. Fix the pindex to record to disk the PoB blocks, it does not do that
 // I added a premature return true; there to pass the loading process, or else the client would not start
-// Also, check what is up with that times of blocks being well the same, probably uses a burn block being made 
-// directly after a PoW block, actually, in the GetBurnHash and the hash calculator, change from pprevBest and pBest
-// to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), CheckBlock(), CBlockIndex(), etc
 //
-//!!!!BIG!!!!
-//Well ... I have to add a lask_nHeight to each block since I cannot use pindexBest when validating best blocks
-// I also took out the hash block->nTime --> prevBlock->nTime and set a constant there, I think it makes things easier
+// to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), CBlockIndex()/CDiskBlockIndex(), etc
+//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -1855,12 +1850,16 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   // slimcoin: compute stake modifier
   uint64 nStakeModifier = 0;
   bool fGeneratedStakeModifier = false;
+
   if(!ComputeNextStakeModifier(pindexNew->pprev, nStakeModifier, fGeneratedStakeModifier))
     return error("AddToBlockIndex() : ComputeNextStakeModifier() failed");
+
   pindexNew->SetStakeModifier(nStakeModifier, fGeneratedStakeModifier);
   pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
+
   if(!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
-    return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016"PRI64x, pindexNew->nHeight, nStakeModifier);
+    return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016"PRI64x, 
+                 pindexNew->nHeight, nStakeModifier);
 
   // Add to mapBlockIndex
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
@@ -1872,6 +1871,11 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   CTxDB txdb;
   if(!txdb.TxnBegin())
     return false;
+  
+  printf("&&&&&&&&&&&&&&Writing WOWOWOWOO %d %d %d %d %d\n", 
+         pindexNew->fProofOfBurn, pindexNew->burnBlkHeight, pindexNew->burnCTx,
+         pindexNew->burnCTxOut, pindexNew->IsProofOfBurn());
+
   txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
   if(!txdb.TxnCommit())
     return false;
@@ -1894,11 +1898,6 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   MainFrameRepaint();
   return true;
 }
-
-
-//TODO i know why it segments, CBlock::GetHash() is not yet in the pindex
-// In the GetBurnHash, the lower (shorter) one, take out the -1
-// Check the CBlock::GetBurnHash() block hash of the last block, or even better, its index
 
 bool CBlock::CheckBlock() const
 {
@@ -1939,14 +1938,12 @@ bool CBlock::CheckBlock() const
 
   // Check coinbase timestamp
   if(GetBlockTime() > (int64)vtx[0].nTime + nMaxClockDrift)
-  {
-    printf("BLK TIME %d, vtx.Time %lld, maxClockDrift %d\n", GetBlockTime(), (int64)vtx[0].nTime, nMaxClockDrift);
     return DoS(50, error("CheckBlock() : coinbase timestamp is too early"));
-  }
 
   // Check coinstake timestamp
   if(IsProofOfStake() && !CheckCoinStakeTimestamp(GetBlockTime(), (int64)vtx[1].nTime))
-    return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%u nTimeTx=%u", GetBlockTime(), vtx[1].nTime));
+    return DoS(50, error("CheckBlock() : coinstake timestamp violation nTimeBlock=%u nTimeTx=%u",
+                         GetBlockTime(), vtx[1].nTime));
 
   // Check coinbase reward
   if(vtx[0].GetValueOut() > (IsProofOfWork() || IsProofOfBurn() ? (GetProofOfWorkReward(nBits) - vtx[0].GetMinFee() + MIN_TX_FEE) : 0))
@@ -3757,6 +3754,13 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
       smallestHashRet = bnTest.getuint256();
   }
 
+  //impossible, usually occurs if the multiplier is so small that it is interpreted as a 0
+  if(!smallestHashRet)
+  {
+    smallestHashRet = ~uint256(0);
+    return error("HashBurnData(): smallestHashRet is 0\n");
+  }
+
   //sucess!
   return true;
 }
@@ -4156,8 +4160,27 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
     return error("SlimCoinMiner : proof-of-burn not meeting target");
 
   //// debug print
-  printf("SlimCoinMiner:\n");
-  printf("new block found  \n  hash: %s  \ntarget: %s\n", hash.GetHex().c_str(), hashTarget.GetHex().c_str());
+  printf("\nSlimCoinMiner:\n");
+
+  if(pblock->IsProofOfWork())
+    printf("New Proof-of-Work block found\n");
+  else if(pblock->IsProofOfStake())
+    printf("New Proof-of-Stake block found\n");
+  else if(pblock->IsProofOfBurn())
+    printf("New Proof-of-Burn block found\n");
+  else
+    printf("Unknow block type found\n");
+
+  printf("\n");
+  printf("Block hash: %s\n", hash.GetHex().c_str());
+
+  //may be useful
+  if(pblock->IsProofOfBurn())
+    printf(" Burn hash: %s\n", burnHash.GetHex().c_str());
+
+  printf("    target: %s\n", hashTarget.GetHex().c_str());
+  printf("\n");
+
   pblock->print();
   printf("%s ", DateTimeStrFormat(GetTime()).c_str());
   printf("generated %s\n", FormatMoney(pblock->vtx[0].vout[0].nValue).c_str());
@@ -4431,10 +4454,9 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       IncrementExtraNonce(pblock.get(), pindexLastBlock, nExtraNonce);
 
       uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
+      printf("Tartget is %s\n", hashTarget.ToString().c_str());
       if(smallestHash < hashTarget)
       {
-        printf("Tartget is %s\n", hashTarget.ToString().c_str());
-
         //Set the PoB flags to true
         pblock->fProofOfBurn = true;
         smallestWTx.GetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);

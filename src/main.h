@@ -1383,7 +1383,6 @@ public:
     burnCTx        = block.burnCTx;
     burnCTxOut     = block.burnCTxOut;
 
-    printf("WASSSS ZIPPP %d %d %d %d\n", fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
   }
 
   CBlock GetBlockHeader() const

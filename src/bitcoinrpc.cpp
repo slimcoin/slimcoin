@@ -955,7 +955,7 @@ Value burncoins(const Array& params, bool fHelp)
 
   int64 nAmount = AmountFromValue(params[1]);
 
-  if(nAmount != 3 * COIN)
+  if(nAmount != 3 * COIN && nAmount < 25 * COIN)
   {
     uint256 smallestHash;
     CWalletTx smallestWTx;
