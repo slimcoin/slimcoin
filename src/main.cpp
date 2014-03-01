@@ -984,9 +984,6 @@ bool CheckProofOfBurn(uint256 hash, unsigned int nBits)
   CBigNum bnTarget;
   bnTarget.SetCompact(nBits);
 
-  printf("00000000000 Check PoB Hash: %s Target: %s\n", 
-         hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());
-
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
     return error("CheckProofOfBurn() : nBits below minimum work");
@@ -1603,8 +1600,7 @@ bool Reorganize(CTxDB& txdb, CBlockIndex* pindexNew)
 }
 
 
-static void
-runCommand(std::string strCommand)
+static void runCommand(std::string strCommand)
 {
   int nErr = ::system(strCommand.c_str());
   if(nErr)
@@ -1654,9 +1650,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
   {
     if(!SetBestChainInner(txdb, pindexNew))
       return error("SetBestChain() : SetBestChainInner failed");
-  }
-  else
-  {
+  }else{
     // the first block in the new chain that will cause it to become the new best chain
     CBlockIndex *pindexIntermediate = pindexNew;
 
@@ -1806,16 +1800,14 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 
 //MYTODO: 
 //
-//Yeah, big dodo, ummm.. where to start. Fix the pindex to record to disk the PoB blocks, it does not do that
-// I added a premature return true; there to pass the loading process, or else the client would not start
+//!!!!!!!BIG ISSUE!!!!!!!
+//   Make someway to prevent someone from stealing other's burn txs since they could simply be like
+//    This is my burn tx and the network would accept it
+//!!!!!!!BIG ISSUE!!!!!!!
 //
-// to check if this block is a PoW block, I also added printf's in the CheckProofOfBurn(), 
-// CBlockIndex()/CDiskBlockIndex(), etc
+//Ok, I 'fixed' that exploit but, it needs testing. I added another if statement to CBlock::CheckBlock()
+// follow that function around, it checks if the public key signatures are the same
 //
-//DO FIRST:
-//
-//When there is a massive burn, it finds a block and then finds another block and then another entering a
-// recursive loop, somehow limit this. Also, the mining of PoB blocks apperently affects the difficulty
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -1877,10 +1869,6 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   if(!txdb.TxnBegin())
     return false;
   
-  printf("&&&&&&&&&&&&&&Writing WOWOWOWOO %d %d %d %d %d\n", 
-         pindexNew->fProofOfBurn, pindexNew->burnBlkHeight, pindexNew->burnCTx,
-         pindexNew->burnCTxOut, pindexNew->IsProofOfBurn());
-
   txdb.WriteBlockIndex(CDiskBlockIndex(pindexNew));
   if(!txdb.TxnCommit())
     return false;
@@ -1917,9 +1905,13 @@ bool CBlock::CheckBlock() const
   if(IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
     return DoS(50, error("CheckBlock() : proof of work failed"));
 
-  // Check proof of burn matches claimed amount
+  // Check proof-of-burn matches claimed amount
   if(IsProofOfBurn() && !CheckProofOfBurn(GetBurnHash(), nBits))
     return DoS(50, error("CheckBlock() : proof of burn failed"));
+
+  // If the block is a PoB, check if the signature of the CTxOut is correct
+  if(IsProofOfBurn() && !BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
+    return DoS(100, error("CheckBlock() : Public signatures do not match with burn transactions's"));
 
   // Check timestamp
   if(GetBlockTime() > GetAdjustedTime() + nMaxClockDrift)
@@ -2059,7 +2051,7 @@ bool CBlock::AcceptBlock()
   return true;
 }
 
-bool ProcessBlock(CNode* pfrom, CBlock* pblock)
+bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 {
   // Check for duplicate
   uint256 hash = pblock->GetHash();
@@ -2171,6 +2163,7 @@ bool ProcessBlock(CNode* pfrom, CBlock* pblock)
          ++mi)
     {
       CBlock* pblockOrphan = (*mi).second;
+
       if(pblockOrphan->AcceptBlock())
         vWorkQueue.push_back(pblockOrphan->GetHash());
       mapOrphanBlocks.erase(pblockOrphan->GetHash());
@@ -3705,9 +3698,65 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
   return (u32int) -1;
 }
 
+//given a valid block height, transaction depth, out transaction dept, this will set values for those
+bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 
+                            CBlock &blockRet, CTransaction &txRet, CTxOut &txOutRet)
+{
+  if(blkHeight < 0 || txDepth < 0 || txOutDepth < 0)
+    return false;
+
+  //Get the block index by burnBlkHeight
+  const CBlockIndex *pindex = 0;
+
+  //if pindexBest is not set yet, scan through the entire map
+  if(!pindexBest)
+  {
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+    {
+      const CBlockIndex *pTestBlkIndex = item.second;
+      if(pTestBlkIndex->nHeight == blkHeight)
+      {
+        pindex = pTestBlkIndex;
+        break;
+      }
+    }
+  }else{
+    for(pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
+      if(pindex->nHeight == blkHeight)
+        break;
+  }
+
+  if(!pindex || !pindex->pprev)
+    return false;
+
+  CBlock block;
+  //Read the block
+  if(!block.ReadFromDisk(pindex))
+    return false;
+
+  if(txDepth >= block.vtx.size())
+    return false;
+
+  CTransaction transaction = block.vtx[txDepth];
+
+  if(txOutDepth >= transaction.vout.size())
+    return false;
+
+  //we may now set the return values if nothing failed
+  blockRet = block;
+  txRet = transaction;
+  txOutRet = transaction.vout[txOutDepth];
+  
+  //sucess!
+  return true;
+}
+
 bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
                   CTxOut &burnTxOut, uint256 &smallestHashRet)
 {
+  //start off the smallest hash the absolute biggest it can be
+  smallestHashRet = ~uint256(0);
+
   if(!mapBlockIndex.count(burnHashBlock))
     return error("HashBurnData(): Block hash %s not found in mapBlockIndex", burnHashBlock);
 
@@ -3720,17 +3769,32 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
                  lastBlkHeight - burned_nHeight, BURN_MIN_CONFIRMS);
 
   //Get the block index for lastBlkHeight
-  CBlockIndex *pindexLast;
-  for(pindexLast = pindexBest; pindexLast && pindexLast->pprev; pindexLast = pindexLast->pprev)
-    if(pindexLast->nHeight == lastBlkHeight)
-      break;
+  const CBlockIndex *pindexLast = 0;
+
+  //if pindexBest is not set yet, scan through the entire map
+  if(!pindexBest)
+  {
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& index, mapBlockIndex)
+    {
+      const CBlockIndex *pTestBlkIndex = index.second;
+      if(pTestBlkIndex->nHeight == lastBlkHeight)
+      {
+        pindexLast = pTestBlkIndex;
+        break;
+      }
+    }
+  }else{
+    for(pindexLast = pindexBest; pindexLast && pindexLast->pprev; pindexLast = pindexLast->pprev)
+      if(pindexLast->nHeight == lastBlkHeight)
+        break;
+  }
 
   if(!pindexLast || !pindexLast->pprev || !pindexLast->GetBlockHash())
     return error("HashBurnData(): Block Height %d not found in block indexes or is not valid", lastBlkHeight);
 
   //the last block index cannot be a proof-of-burn
   if(pindexLast->IsProofOfBurn())
-    return error("HashBurnData(): pindexLast is a proof-of-burn index");
+    return error("HashBurnData(): pindexLast %d is a proof-of-burn index", pindexLast->nHeight);
 
   //calculate the multiplier for the hash
   const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
@@ -3739,9 +3803,6 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
   //the largest value a uint256 can store
   const CBigNum bnMax(~uint256(0));
   CBigNum bnTest;
-
-  //start off the smallest hash the absolute biggest it can be
-  smallestHashRet = ~uint256(0);
 
   // Calculate hashes
   u32int i;
@@ -3778,35 +3839,21 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
 bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet)
 {
+  //make the smallest hash the absolute biggest it can be
+  smallestHashRet = ~uint256(0);
+
   if(lastBlkHeight < 0 || burnBlkHeight < 0 || burnCTx < 0 || burnCTxOut < 0)
     return error("GetBurnHash(): Input indexes are invalid %d:%d:%d:%d\n", 
                  lastBlkHeight, burnBlkHeight, burnCTx, burnCTxOut);
 
-  //Get the block index by burnBlkHeight
-  CBlockIndex *pindex;
-  for(pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
-    if(pindex->nHeight == burnBlkHeight)
-      break;
-
-  if(!pindex || !pindex->pprev)
-    return error("GetBurnHash(): Block Height %d not found in block indexes", burnBlkHeight);
-
-  //Read the block containing this burnt transaction from the disk
   CBlock block;
-  if(!block.ReadFromDisk(pindex))
-    return error("GetBurnHash(): block.ReadFromDisk failed");
+  CTransaction burnTx;
+  CTxOut burnTxOut;
 
-  uint256 hashBlock = block.GetHash();
+  if(!GetAllTxClassesByIndex(burnBlkHeight, burnCTx, burnCTxOut, block, burnTx, burnTxOut))
+    return error("GetBurnHash(): Unable to read burn transaction %d:%d:%d\n", burnBlkHeight, burnCTx, burnCTxOut);
 
-  if(burnCTx >= block.vtx.size())
-    return error("GetBurnHash(): burn transaction index larger than block's number of transactions");
-
-  CTransaction burnTx = block.vtx[burnCTx];
-
-  if(burnCTxOut >= burnTx.vout.size())
-    return error("GetBurnHash(): burn OutTx index larger than transaction's number of out transactions");
-
-  CTxOut burnTxOut = burnTx.vout[burnCTxOut];
+  const uint256 hashBlock = block.GetHash();
 
   //check if burnTxOut's address is a burn address
   // with a bunch of sanity checks
@@ -3837,6 +3884,9 @@ bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
 bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet)
 {
+  //make the smallest hash the absolute biggest it can be
+  smallestHashRet = ~uint256(0);
+
   //the hashBlock must appear in the mapBlockIndex
   if(!mapBlockIndex.count(hashBlock))
     return error("GetBurnHash(): Block hash %s not found in mapBlockIndex", hashBlock.ToString().c_str());
@@ -3876,7 +3926,7 @@ int64 nLastCoinStakeSearchInterval = 0;
 
 // CreateNewBlock:
 //   fProofOfStake: try (best effort) to make a proof-of-stake block
-CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
+CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, CWalletTx *burnWalletTx)
 {
   CReserveKey reservekey(pwallet);
 
@@ -3885,12 +3935,52 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
   if(!pblock.get())
     return NULL;
 
+  //if the burnWalletTx is a non-NULL pointer, set the burn coords
+  if(burnWalletTx)
+  {
+    if(!mapBlockIndex.count(burnWalletTx->hashBlock))
+      return NULL;
+
+    pblock->fProofOfBurn = true;
+    pblock->burnBlkHeight = mapBlockIndex.at(burnWalletTx->hashBlock)->nHeight;
+    pblock->burnCTx = burnWalletTx->nIndex;
+    pblock->burnCTxOut = burnWalletTx->GetBurnOutTxIndex();
+  }
+
   // Create coinbase tx
   CTransaction txNew;
   txNew.vin.resize(1);
   txNew.vin[0].prevout.SetNull();
   txNew.vout.resize(1);
-  txNew.vout[0].scriptPubKey << reservekey.GetReservedKey() << OP_CHECKSIG;
+
+  //handle the public key of burn block differently
+  if(pblock->IsProofOfBurn())
+  {
+    CBlock burnBlock;
+    CTransaction burnTx;
+    CTxOut burnTxOut;
+
+    if(!GetAllTxClassesByIndex(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, 
+                               burnBlock, burnTx, burnTxOut))
+      return NULL;
+
+    CScript sendersPubKey;
+    if(!burnTx.GetSendersPubKey(sendersPubKey))
+      return NULL;
+
+    vector<valtype> vSolutions;
+    txnouttype whichType;
+    if(!Solver(sendersPubKey, whichType, vSolutions))
+      return NULL;
+
+    if(whichType != TX_PUBKEY)
+      return NULL;
+
+    txNew.vout[0].scriptPubKey << vSolutions[0];
+  }else
+    txNew.vout[0].scriptPubKey << reservekey.GetReservedKey();
+
+  txNew.vout[0].scriptPubKey << OP_CHECKSIG;
 
   // Add our coinbase tx as first transaction
   pblock->vtx.push_back(txNew);
@@ -4070,7 +4160,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
 
   }
 
-  if(pblock->IsProofOfWork())
+  if(pblock->IsProofOfWork() || pblock->IsProofOfBurn())
     pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pblock->nBits);
 
   // Fill in header
@@ -4083,7 +4173,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
   pblock->nTime = max(pindexPrev->GetMedianTimePast()+1, pblock->GetMaxTransactionTime());
   pblock->nTime = max(pblock->GetBlockTime(), pindexPrev->GetBlockTime() - nMaxClockDrift);
 
-  if(pblock->IsProofOfWork())
+  if(pblock->IsProofOfWork() || pblock->IsProofOfBurn())
     pblock->UpdateTime(pindexPrev);
 
   pblock->nNonce = 0;
@@ -4171,6 +4261,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey)
   //// debug print
   printf("\nSlimCoinMiner:\n");
 
+  //It is useful to say what type of block was found
   if(pblock->IsProofOfWork())
     printf("New Proof-of-Work block found\n");
   else if(pblock->IsProofOfStake())
@@ -4441,42 +4532,40 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       CWalletTx smallestWTx;
       tie(smallestHash, smallestWTx) = HashAllBurntTx();
 
-      printf("Hash block %s %s\n", smallestWTx.hashBlock.ToString().c_str(), smallestHash.ToString().c_str());
-
-      if(!smallestWTx.hashBlock)
+      //if the smallest hash == 0xfffffffff..., that means there was some sort of error, so continue
+      if(!smallestWTx.hashBlock || smallestHash == ~uint256(0))
         continue;
       
-      printf("=============================Smallest Hash is this %s\n\tby tx %s\n", 
+      printf("SlimCoinAfterBurner(): Smallest Hash is %s\n\tby tx %s\n", 
              smallestHash.ToString().c_str(), smallestWTx.GetHash().ToString().c_str());
 
-      printf("\t============Block height %d, transaction depth %d, vout depth %d\n", 
+      printf("\twith Block height %d, transaction depth %d, vout depth %d\n", 
              mapBlockIndex.at(smallestWTx.hashBlock)->nHeight, 
              smallestWTx.nIndex, smallestWTx.GetBurnOutTxIndex());
 
       //
       // Create new block
       //
-      auto_ptr<CBlock> pblock(CreateNewBlock(pwallet));
+      auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, false, &smallestWTx));
       if(!pblock.get())
         return;
 
       IncrementExtraNonce(pblock.get(), pindexLastBlock, nExtraNonce);
 
       uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
-      printf("Tartget is %s\n", hashTarget.ToString().c_str());
+      printf("\tTartget is %s\n", hashTarget.ToString().c_str());
       if(smallestHash < hashTarget)
       {
         //Set the PoB flags to true
         pblock->fProofOfBurn = true;
         smallestWTx.GetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
 
+        //hash it as if it was not our block and test if the smallestHashes are the same
         uint256 hasher;
         GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
 
         if(hasher != smallestHash)
           continue;
-
-        printf("WOW such hash %s\n", hasher.ToString().c_str());
 
         //TODO: CTransaction errors out when processing a block, no good, at main.cpp :: 491
         // possible has to do with this

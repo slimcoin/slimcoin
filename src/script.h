@@ -17,6 +17,7 @@ typedef std::vector<unsigned char> valtype;
 
 class CTransaction;
 class CKeyStore;
+class CScript;
 
 /** Signature hash types/flags */
 enum
@@ -188,6 +189,7 @@ enum opcodetype
 
 const char* GetOpName(opcodetype opcode);
 
+bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet);
 
 
 inline std::string ValueString(const std::vector<unsigned char>& vch)
@@ -334,20 +336,16 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
     if (b.size() < OP_PUSHDATA1)
     {
       insert(end(), (unsigned char)b.size());
-    }
-    else if (b.size() <= 0xff)
+    }else if (b.size() <= 0xff)
     {
       insert(end(), OP_PUSHDATA1);
       insert(end(), (unsigned char)b.size());
-    }
-    else if (b.size() <= 0xffff)
+    }else if (b.size() <= 0xffff)
     {
       insert(end(), OP_PUSHDATA2);
       unsigned short nSize = b.size();
       insert(end(), (unsigned char*)&nSize, (unsigned char*)&nSize + sizeof(nSize));
-    }
-    else
-    {
+    }else{
       insert(end(), OP_PUSHDATA4);
       unsigned int nSize = b.size();
       insert(end(), (unsigned char*)&nSize, (unsigned char*)&nSize + sizeof(nSize));
@@ -395,49 +393,50 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
   bool GetOp2(const_iterator& pc, opcodetype& opcodeRet, std::vector<unsigned char>* pvchRet) const
   {
     opcodeRet = OP_INVALIDOPCODE;
-    if (pvchRet)
+    if(pvchRet)
       pvchRet->clear();
-    if (pc >= end())
+
+    if(pc >= end())
       return false;
 
     // Read instruction
-    if (end() - pc < 1)
+    if(end() - pc < 1)
       return false;
     unsigned int opcode = *pc++;
 
     // Immediate operand
-    if (opcode <= OP_PUSHDATA4)
+    if(opcode <= OP_PUSHDATA4)
     {
       unsigned int nSize;
       if (opcode < OP_PUSHDATA1)
       {
         nSize = opcode;
-      }
-      else if (opcode == OP_PUSHDATA1)
+      }else if (opcode == OP_PUSHDATA1)
       {
         if (end() - pc < 1)
           return false;
         nSize = *pc++;
-      }
-      else if (opcode == OP_PUSHDATA2)
+      }else if (opcode == OP_PUSHDATA2)
       {
         if (end() - pc < 2)
           return false;
         nSize = 0;
         memcpy(&nSize, &pc[0], 2);
         pc += 2;
-      }
-      else if (opcode == OP_PUSHDATA4)
+      }else if (opcode == OP_PUSHDATA4)
       {
         if (end() - pc < 4)
           return false;
         memcpy(&nSize, &pc[0], 4);
         pc += 4;
       }
-      if (end() - pc < nSize)
+
+      if(end() - pc < nSize)
         return false;
-      if (pvchRet)
+
+      if(pvchRet)
         pvchRet->assign(pc, pc + nSize);
+
       pc += nSize;
     }
 
@@ -487,6 +486,34 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
       if (opcode == op)
         ++nFound;
     return nFound;
+  }
+
+  bool comparePubKeySignature(const CScript &scriptPubKey) const
+  {
+    //Get the solutions for this CScript
+    vector<valtype> vSolutionsThis;
+    txnouttype whichTypeThis;
+    if(!Solver(*this, whichTypeThis, vSolutionsThis))
+      return false;
+
+    if(whichTypeThis != TX_PUBKEY)
+      return false;
+
+    //Get the solutions for the testing CScript
+    vector<valtype> vSolutionsTesting;
+    txnouttype whichTypeTesting;
+    if(!Solver(scriptPubKey, whichTypeTesting, vSolutionsTesting))
+      return false;
+
+    if(whichTypeTesting != TX_PUBKEY)
+      return false;
+
+    //vSolutions[0] contains the public key
+    // inorder to be compared, each pubKey has to be converted to a string
+    printf("&&&&&&&&&&&Comparing %s %s\n", ValueString(vSolutionsThis[0]).c_str(), 
+           ValueString(vSolutionsTesting[0]).c_str());
+    return ValueString(vSolutionsThis[0]) == ValueString(vSolutionsTesting[0]);
+
   }
 
   // Pre-version-0.6, Bitcoin always counted CHECKMULTISIGs
@@ -567,7 +594,6 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
 
 
 bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, const CTransaction& txTo, unsigned int nIn, int nHashType);
-bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet);
 int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned char> >& vSolutions);
 bool IsStandard(const CScript& scriptPubKey);
 bool IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);

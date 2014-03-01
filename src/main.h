@@ -26,6 +26,7 @@ class CBlockIndex;
 class CKeyItem;
 class CReserveKey;
 class COutPoint;
+class CWalletTx;
 class CTransaction;
 class CTxOut;
 
@@ -117,7 +118,7 @@ void PrintBlockTree();
 bool ProcessMessages(CNode* pfrom);
 bool SendMessages(CNode* pto, bool fSendTrickle);
 void GenerateSlimcoins(bool fGenerate, CWallet* pwallet);
-CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false);
+CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, CWalletTx *burnWalletTx=NULL);
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
@@ -141,7 +142,8 @@ bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet);
 bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet);
-
+bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 
+                            CBlock &blockRet, CTransaction &txRet, CTxOut &txOutRet);
 
 
 
@@ -597,8 +599,8 @@ public:
     return nValueOut;
   }
 
-  //Returns the address of the first txIn in addressRet
-  bool GetSendersAddress(CBitcoinAddress &addressRet) const
+  //Returns the pubKet of the first txIn of this tx
+  bool GetSendersPubKey(CScript &scriptPubKeyRet) const
   {
     if(vin.empty())
       return false;
@@ -607,11 +609,13 @@ public:
     CTransaction prevTx;
 
     //read the transaction of the prevout
-    if(prevTx.ReadFromDisk(input.prevout) == false)
+    if(!prevTx.ReadFromDisk(input.prevout))
       return false; //if the read disk failed
 
-    //Extract the address from the indexed TxOut's scriptPubKey
-    return ExtractAddress(prevTx.vout[input.prevout.n].scriptPubKey, addressRet);
+    scriptPubKeyRet = prevTx.vout[input.prevout.n].scriptPubKey;
+
+    //sucess!
+    return true;
   }
 
   //return the index of a burn transaction in vout, -1 if not found
@@ -622,7 +626,7 @@ public:
 
     if(!burnAddress.IsValid())
     {
-      printf("CTransaction GetBurnTxIndex: Burn address is invalid");
+      printf("CTransaction GetBurnOutTxIndex: Burn address is invalid");
       return -1;
     }
 
@@ -1042,6 +1046,7 @@ public:
     return Hash(BEGIN(nVersion), END(nNonce));
   }
 
+  //PoB
   uint256 GetBurnHash() const
   {
     if(!IsProofOfBurn())
@@ -1054,6 +1059,24 @@ public:
     return hash;
   }
   
+  //check this block's coinbase public key signature with that of the given transaction index
+  bool BurnCheckPubKeys(s32int blkHeight, s32int txDepth, s32int txOutDepth) const
+  {
+    CBlock indexBlock;
+    CTransaction indexTx;
+    CTxOut indexTxOut;
+    if(!GetAllTxClassesByIndex(blkHeight, txDepth, txOutDepth, indexBlock, indexTx, indexTxOut))
+      return false;
+
+    CScript indexTxScript;
+    if(!indexTx.GetSendersPubKey(indexTxScript))
+      return false;
+
+    return vtx[0].vout[0].scriptPubKey.comparePubKeySignature(indexTxScript);
+  }
+
+  //PoB
+
   int64 GetBlockTime() const
   {
     return (int64)nTime;
@@ -1426,20 +1449,14 @@ public:
 
   bool CheckIndex() const
   {
-    printf("------------------------------- %d %d %d %d %d %d %d\n",
-           IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
-    return true;
+    printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
+           nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
+           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
+    //~ return true;
 
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
-    else if(IsProofOfBurn())
-    {
-      printf("+++++++++++++++++++++++++\n");
-
-      uint256 burnHash;
-      GetBurnHash(nHeight, burnBlkHeight, burnCTx, burnCTxOut, burnHash);
-      return CheckProofOfBurn(burnHash, nBits);
-    }else if(IsProofOfStake())
+    else if(IsProofOfBurn() || IsProofOfStake()) //it will check these after all of the block indexes are loaded
       return true;
     else
       return false;

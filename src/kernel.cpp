@@ -518,7 +518,7 @@ std::pair<uint256, CWalletTx> HashAllBurntTx()
       it != pwalletMain->setBurnHashes.end(); ++it)
   {
     CWalletTx tmpWTx = pwalletMain->mapWallet.at(*it);
-    printf("=============%s\n", tmpWTx.GetHash().ToString().c_str());
+    //~ printf("HashAllBurntTx(): Tx hash %s\n", tmpWTx.GetHash().ToString().c_str());
     u32int confirms = tmpWTx.GetDepthInMainChain();
     if(!confirms) //a transaction hash to have atleast some confirmations
       continue;

@@ -471,8 +471,6 @@ bool CTxDB::ReadDiskTx(COutPoint outpoint, CTransaction& tx)
 
 bool CTxDB::WriteBlockIndex(const CDiskBlockIndex& blockindex)
 {
-  printf("WASSSS ZIPPP %d %d %d %d\n", 
-         blockindex.fProofOfBurn, blockindex.burnBlkHeight, blockindex.burnCTx, blockindex.burnCTxOut);
   return Write(make_pair(string("blockindex"), blockindex.GetBlockHash()), blockindex);
 }
 
@@ -599,6 +597,12 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->nBits          = diskindex.nBits;
         pindexNew->nNonce         = diskindex.nNonce;
 
+        //Load Proof of Burn switch and indexes
+        pindexNew->fProofOfBurn   = diskindex.fProofOfBurn;
+        pindexNew->burnBlkHeight  = diskindex.burnBlkHeight;
+        pindexNew->burnCTx        = diskindex.burnCTx;
+        pindexNew->burnCTxOut     = diskindex.burnCTxOut;
+
         // Watch for genesis block
         if(pindexGenesisBlock == NULL && diskindex.GetBlockHash() == hashGenesisBlock)
           pindexGenesisBlock = pindexNew;
@@ -613,11 +617,30 @@ bool CTxDB::LoadBlockIndex()
         break; // if shutdown requested or finished loading block index
 
     }    // try
-    catch (std::exception &e)
+    catch(std::exception &e)
     {
       return error("%s : deserialize error", __PRETTY_FUNCTION__);
     }
   }
+
+  {
+    //after all of the indexes are loaded, now check the proof-of-burn blocks
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+    {
+      const CBlockIndex *pTestBlkIndex = item.second;
+      //if this index is a proof-of-burn, check it
+      if(pTestBlkIndex->IsProofOfBurn())
+      {
+        uint256 burnHash;
+        //nHeight - 1 since we want the blockindex before this one
+        GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
+                    pTestBlkIndex->burnCTxOut, burnHash);
+        if(!CheckProofOfBurn(burnHash, pTestBlkIndex->nBits))
+          return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
+      }
+    }
+  }
+
   pcursor->close();
 
   if(fRequestShutdown)
