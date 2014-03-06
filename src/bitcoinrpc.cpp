@@ -938,7 +938,7 @@ Value calcburnhash(const Array &params, bool fHelp)
 {
   if(fHelp)
     throw runtime_error(
-      "calcBurnHash [fPrintRegardless=false]\n"
+      "calcburnhash [fPrintRegardless=false]\n"
       "Returns the smallest hash of all of the burn transactions\n"
       "If fPrintRegardless is true, it returns the smallest hash\n"
       "\tregardless if it was able to be calculated");
@@ -955,12 +955,15 @@ Value calcburnhash(const Array &params, bool fHelp)
   string output = "";
   if(smallestHash == ~uint256(0))
   {
-    //this is most commonly caused if the best block in the chain is a PoB block
+    //if there are no burnt coins or the best block in the chain is a PoB block
+    if(pwalletMain->setBurnHashes.empty())
+      output += "Found no burnt coins or coins are not mature enough\n";
+
     if(pindexBest->IsProofOfBurn())
       output += "Last block in chain is a proof-of-burn block\n";
 
     if(!fPrintRegardless)
-      return output + "Unable to calculate the smallest burn hash";
+      return output += "Unable to calculate the smallest burn hash";
     else
       output += "Unable to calculate the smallest burn hash, printing regardless...\n\n";
   }

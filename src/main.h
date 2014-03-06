@@ -154,8 +154,8 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, const CWallet
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
-bool CheckProofOfWork(uint256 hash, unsigned int nBits);
-bool CheckProofOfBurn(uint256 hash, unsigned int nBits);
+bool CheckProofOfWork(uint256 hash, u32int nBits);
+bool CheckProofOfBurn(uint256 hash, u32int nBurnBits);
 int64 GetProofOfWorkReward(unsigned int nBits);
 int64 GetProofOfStakeReward(int64 nCoinAge);
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);

@@ -999,18 +999,18 @@ bool CheckProofOfWork(uint256 hash, u32int nBits)
   return true;
 }
 
-bool CheckProofOfBurn(uint256 hash, u32int nBits)
+bool CheckProofOfBurn(uint256 hash, u32int nBurnBits)
 {
   CBigNum bnTarget;
-  bnTarget.SetCompact(nBits);
+  bnTarget.SetCompact(nBurnBits);
 
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
-    return error("CheckProofOfBurn() : nBits below minimum work");
+    return error("CheckProofOfBurn() : nBurnBits below minimum work");
 
   // Check proof of work matches claimed amount
   if(hash > bnTarget.getuint256())
-    return error("CheckProofOfBurn() : hash doesn't match nBits");
+    return error("CheckProofOfBurn() : hash doesn't match nBurnBits");
 
   return true;
 }
@@ -2297,7 +2297,7 @@ bool CBlock::CheckBurnEffectiveCoins() const
   }
 
   //the effective coins should equal each other
-  return nEffectiveBurnCoins == (pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins;
+  return nEffectiveBurnCoins == (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
 }
 
 
@@ -3739,7 +3739,7 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
   u32int orig_nNonce = *nNonce;
   uint8_t digest[DCRYPT_DIGEST_LENGTH];
 
-  for(;;)
+  for(; !fShutdown;)
   {
     //hash the block
     (*nNonce)++;
@@ -4372,7 +4372,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
   }
 
   //The new blocks nEffectiveBurnCoins is (the last blocks effective burn coisn / BURN_DECAY_RATE) + nBurnCoins
-  pblock->nEffectiveBurnCoins = (pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins;
+  pblock->nEffectiveBurnCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
   pblock->nBurnBits = GetNextBurnTargetRequired(pindexPrev);
 
   //Por ultimo, set the block rewards
@@ -4583,7 +4583,8 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
       continue;
     }
 
-    printf("Running SlimCoinMiner with %d transactions in block\n", pblock->vtx.size());
+    printf("Running SlimCoinMiner with %d %s in block\n", 
+           pblock->vtx.size(), pblock->vtx.size() != 1 ? "transactions" : "transaction");
 
 
     //
@@ -4665,6 +4666,7 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
               nLogTime = GetTime();
               printf("%s ", DateTimeStrFormat(GetTime()).c_str());
               printf("hashmeter %3d CPUs %6.0f hash/s\n", vnThreadsRunning[THREAD_MINER], dHashesPerSec);
+              printf("Target: %s\n", hashTarget.ToString().substr(0, 20).c_str());
             }
           }
         }
