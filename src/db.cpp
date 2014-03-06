@@ -530,7 +530,7 @@ CBlockIndex static * InsertBlockIndex(uint256 hash)
     return (*mi).second;
 
   // Create new
-  CBlockIndex* pindexNew = new CBlockIndex();
+  CBlockIndex *pindexNew = new CBlockIndex();
 
   if(!pindexNew)
     throw runtime_error("LoadBlockIndex() : new CBlockIndex failed");
@@ -578,7 +578,7 @@ bool CTxDB::LoadBlockIndex()
         ssValue >> diskindex;
 
         // Construct block index object
-        CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
+        CBlockIndex *pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
         pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
         pindexNew->pnext          = InsertBlockIndex(diskindex.hashNext);
         pindexNew->nFile          = diskindex.nFile;
@@ -602,6 +602,8 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->burnBlkHeight  = diskindex.burnBlkHeight;
         pindexNew->burnCTx        = diskindex.burnCTx;
         pindexNew->burnCTxOut     = diskindex.burnCTxOut;
+        pindexNew->nEffectiveBurnCoins = diskindex.nEffectiveBurnCoins;
+        pindexNew->nBurnBits      = diskindex.nBurnBits;
 
         // Watch for genesis block
         if(pindexGenesisBlock == NULL && diskindex.GetBlockHash() == hashGenesisBlock)
@@ -623,25 +625,25 @@ bool CTxDB::LoadBlockIndex()
     }
   }
 
+  pcursor->close();
+
   {
     //after all of the indexes are loaded, now check the proof-of-burn blocks
-    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*) &item, mapBlockIndex)
     {
       const CBlockIndex *pTestBlkIndex = item.second;
       //if this index is a proof-of-burn, check it
       if(pTestBlkIndex->IsProofOfBurn())
       {
-        uint256 burnHash;
+        uint256 burnHashRet;
         //nHeight - 1 since we want the blockindex before this one
         GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                    pTestBlkIndex->burnCTxOut, burnHash);
-        if(!CheckProofOfBurn(burnHash, pTestBlkIndex->nBits))
+                    pTestBlkIndex->burnCTxOut, burnHashRet);
+        if(!CheckProofOfBurn(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
       }
     }
   }
-
-  pcursor->close();
 
   if(fRequestShutdown)
     return true;

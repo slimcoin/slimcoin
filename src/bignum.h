@@ -529,6 +529,13 @@ inline const CBigNum operator*(const CBigNum& a, const double b)
   return (a / CBigNum(denomintator)) * CBigNum(numerator);
 }
 
+//not the most efficient way, but get the job done
+inline const CBigNum operator/(const CBigNum& a, const double b)
+{
+  double multiply = 1 / b;
+  return a * multiply;
+}
+
 inline const CBigNum operator%(const CBigNum& a, const CBigNum& b)
 {
   CAutoBN_CTX pctx;

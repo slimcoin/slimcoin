@@ -30,6 +30,7 @@ class CWalletTx;
 class CTransaction;
 class CTxOut;
 
+
 class CAddress;
 class CInv;
 class CRequestTracker;
@@ -97,9 +98,40 @@ extern std::map<uint256, CBlock*> mapOrphanBlocks;
 // Settings
 extern int64 nTransactionFee;
 
-//PoB addresses defined in kernel.h
-extern const CBitcoinAddress burnOfficialAddress;
-extern const CBitcoinAddress burnTestnetAddress;
+//////////////////////////////////////////////////////////////////////////////
+/*                              Proof Of Burn                               */
+//////////////////////////////////////////////////////////////////////////////
+
+//Burn addresses
+const CBitcoinAddress burnOfficialAddress("1111111111111111111111111111111111");
+const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
+
+#define BURN_CONSTANT     .01 * CENT
+#define BURN_HASH_DOUBLE  1000.0  //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
+#define BURN_DECAY_RATE   1.000693388 //the growth rate of the hash (2 ** (1 / BURN_HASH_DOUBLE)) rounded up
+#define BURN_HASH_COUNT   1000    //the amount of hashes to be done when getting the smallest hash
+#define BURN_MIN_CONFIRMS 1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
+#define BURN_HARDER_TARGET 0.6    //make the burn target 0.6 times the intermediate calculated target
+
+void SlimCoinAfterBurner(CWallet *pwallet);
+bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
+                  CTxOut &burnTxOut, uint256 &smallestHashRet);
+bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
+                 s32int burnCTxOut, uint256 &smallestHashRet);
+bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
+                 s32int burnCTxOut, uint256 &smallestHashRet);
+bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 
+                            CBlock &blockRet, CTransaction &txRet, CTxOut &txOutRet);
+
+//Scans all of the hashes of this transaction and returns the smallest one
+bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
+
+//Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
+std::pair<uint256, const CWalletTx&> HashAllBurntTx();
+
+//////////////////////////////////////////////////////////////////////////////
+/*                              Proof Of Burn                               */
+//////////////////////////////////////////////////////////////////////////////
 
 
 
@@ -118,7 +150,7 @@ void PrintBlockTree();
 bool ProcessMessages(CNode* pfrom);
 bool SendMessages(CNode* pto, bool fSendTrickle);
 void GenerateSlimcoins(bool fGenerate, CWallet* pwallet);
-CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, CWalletTx *burnWalletTx=NULL);
+CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, const CWalletTx *burnWalletTx=NULL);
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
@@ -133,17 +165,6 @@ std::string GetWarnings(std::string strFor);
 uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
 void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake);
-
-//PoB
-void SlimCoinAfterBurner(CWallet *pwallet);
-bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
-                  CTxOut &burnTxOut, uint256 &smallestHashRet);
-bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet);
-bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet);
-bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 
-                            CBlock &blockRet, CTransaction &txRet, CTxOut &txOutRet);
 
 
 
@@ -645,6 +666,10 @@ public:
     return i == vout.size() ? -1 : i;
   }
   
+  bool IsBurnTx() const
+  {
+    return GetBurnOutTxIndex() == -1 ? false : true;
+  }
 
   /** Amount of bitcoins coming in to this transaction
       Note that lightweight clients may not know anything besides the hash of previous transactions,
@@ -962,12 +987,13 @@ public:
   unsigned int nBits;
   unsigned int nNonce;
 
-  // Proof of Burn switch and indexes
+  // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
-  //indexes to which block, transaction, out transaction the burnt coins are in
   s32int burnBlkHeight;
   s32int burnCTx;
   s32int burnCTxOut;
+  int64 nEffectiveBurnCoins;
+  u32int nBurnBits;
 
   // network and disk
   std::vector<CTransaction> vtx;
@@ -1003,6 +1029,8 @@ public:
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
+      READWRITE(nEffectiveBurnCoins);
+      READWRITE(nBurnBits);
 
       // ConnectBlock depends on vtx following header to generate CDiskTxPos
       if(!(nType & (SER_GETHASH | SER_BLOCKHEADERONLY)))
@@ -1029,6 +1057,8 @@ public:
     //proof of burn defaults
     fProofOfBurn = false;
     burnBlkHeight = burnCTx = burnCTxOut = -1; //set indexes to negative
+    nEffectiveBurnCoins = 0;
+    nBurnBits = 0;
 
     vtx.clear();
     vchBlockSig.clear();
@@ -1074,6 +1104,8 @@ public:
 
     return vtx[0].vout[0].scriptPubKey.comparePubKeySignature(indexTxScript);
   }
+
+  bool CheckBurnEffectiveCoins() const;
 
   //PoB
 
@@ -1331,11 +1363,13 @@ public:
   unsigned int nBits;
   unsigned int nNonce;
 
-  // Proof of Burn switch and indexes
+  // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
   s32int burnBlkHeight;
   s32int burnCTx;
   s32int burnCTxOut;
+  int64 nEffectiveBurnCoins;
+  u32int nBurnBits;
 
   CBlockIndex()
   {
@@ -1362,10 +1396,12 @@ public:
     nNonce         = 0;
 
     //PoB
-    fProofOfBurn = false;
-    burnBlkHeight = -1;
-    burnCTx = -1;
-    burnCTxOut = -1;
+    fProofOfBurn   = false;
+    burnBlkHeight  = -1;
+    burnCTx        = -1;
+    burnCTxOut     = -1;
+    nEffectiveBurnCoins = 0;
+    nBurnBits      = 0;
   }
 
   CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
@@ -1405,6 +1441,8 @@ public:
     burnBlkHeight  = block.burnBlkHeight;
     burnCTx        = block.burnCTx;
     burnCTxOut     = block.burnCTxOut;
+    nEffectiveBurnCoins = block.nEffectiveBurnCoins;
+    nBurnBits      = block.nBurnBits;
 
   }
 
@@ -1452,7 +1490,6 @@ public:
     printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
            nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
            fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
-    //~ return true;
 
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
@@ -1603,13 +1640,13 @@ public:
       READWRITE(nMoneySupply);
       READWRITE(nFlags);
       READWRITE(nStakeModifier);
-      if (IsProofOfStake())
+
+      if(IsProofOfStake())
       {
         READWRITE(prevoutStake);
         READWRITE(nStakeTime);
         READWRITE(hashProofOfStake);
-      }
-      else if (fRead)
+      }else if(fRead)
       {
         const_cast<CDiskBlockIndex*>(this)->prevoutStake.SetNull();
         const_cast<CDiskBlockIndex*>(this)->nStakeTime = 0;
@@ -1629,6 +1666,8 @@ public:
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
+      READWRITE(nEffectiveBurnCoins);
+      READWRITE(nBurnBits);
       )
 
     uint256 GetBlockHash() const

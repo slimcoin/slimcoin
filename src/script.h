@@ -510,8 +510,6 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
 
     //vSolutions[0] contains the public key
     // inorder to be compared, each pubKey has to be converted to a string
-    printf("&&&&&&&&&&&Comparing %s %s\n", ValueString(vSolutionsThis[0]).c_str(), 
-           ValueString(vSolutionsTesting[0]).c_str());
     return ValueString(vSolutionsThis[0]) == ValueString(vSolutionsTesting[0]);
 
   }

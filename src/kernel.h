@@ -44,26 +44,4 @@ unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum);
 
-
-//////////////////////////////////////////////////////////////////////////////
-/*                              Proof Of Burn                               */
-//////////////////////////////////////////////////////////////////////////////
-
-//~ #define BURN_CONSTANT 10.0 * COIN
-
-//these numbers need to be doubles
-#define BURN_CONSTANT     .01 * CENT
-#define BURN_HASH_DOUBLE  1000.0  //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
-#define BURN_HASH_COUNT   1000    //the amount of hashes to be done when getting the smallest hash
-#define BURN_MIN_CONFIRMS 1       //a burn transaction requires atleast x > 1 confimations
-
-extern const CBitcoinAddress burnOfficialAddress;
-extern const CBitcoinAddress burnTestnetAddress;
-
-//Scans all of the hashes of this transaction and returns the smallest one
-bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
-
-//Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
-std::pair<uint256, CWalletTx> HashAllBurntTx();
-
 #endif // SMCOIN_KERNEL_H
