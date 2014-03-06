@@ -127,7 +127,7 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
 
 //Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
-std::pair<uint256, const CWalletTx&> HashAllBurntTx();
+std::pair<uint256, const CWalletTx> HashAllBurntTx();
 
 //////////////////////////////////////////////////////////////////////////////
 /*                              Proof Of Burn                               */

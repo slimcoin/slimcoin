@@ -1824,6 +1824,8 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //GetProofOfBurnReward is not fully made, uses GetPoWReward inside
 //
+//FIX: SlimcoinAfterBurner throws a std::bad_alloc, it is in the for loop in HashAllBurntTx()
+//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -4038,7 +4040,7 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
   return HashBurnData(burnWTx.hashBlock, pindexBest->nHeight, (CTransaction&)burnWTx, burnTxOut, smallestHashRet);
 }
 
-std::pair<uint256, const CWalletTx&> HashAllBurntTx()
+std::pair<uint256, const CWalletTx> HashAllBurntTx()
 {
   //give the smallest hash the absolute largest value it can hold
   uint256 smallestHash(~uint256(0));
