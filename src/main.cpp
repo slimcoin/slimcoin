@@ -874,7 +874,6 @@ int64 GetProofOfWorkReward(u32int nBits)
   }
 
   nSubsidy = bnUpperBound.getuint64();
-
   nSubsidy = (nSubsidy / CENT) * CENT;
 
   if(fDebug && GetBoolArg("-printcreation"))
@@ -2274,6 +2273,10 @@ bool CBlock::CheckBlockSignature() const
 
 bool CBlock::CheckBurnEffectiveCoins() const
 {
+  //Genesis Block
+  if(!hashPrevBlock)
+    return true;
+
   CBlockIndex *pindexPrev;
 
   std::map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
