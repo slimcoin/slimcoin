@@ -927,7 +927,8 @@ u32int ComputeMinWork(u32int nBase, int64 nTime)
 // slimcoin: find last block index up to pindex
 const CBlockIndex *GetLastBlockIndex(const CBlockIndex *pindex, bool fProofOfStake)
 {
-  while(pindex && pindex->pprev && (pindex->IsProofOfStake() != fProofOfStake))
+  //exclude PoB blocks from this calculation
+  while(pindex && pindex->pprev && (pindex->IsProofOfStake() != fProofOfStake || pindex->IsProofOfBurn()))
     pindex = pindex->pprev;
 
   return pindex;
@@ -970,15 +971,23 @@ static u32int GetNextTargetRequired(const CBlockIndex *pindexLast, bool fProofOf
 
 static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
 {
-  if(pindexLast == NULL)
+  //go back (BURN_MIN_CONFIRMS - 1), -1 since the index passed is -1 from the current already
+  const CBlockIndex *pindexBack = pindexLast;
+  s32int i;
+  for(i = 0; i < BURN_MIN_CONFIRMS - 1 && pindexBack; i++)
+  {
+    pindexBack = pindexBack->pprev;
+  }
+
+  if(pindexBack == NULL)
     return CBigNum(0).GetCompact();
 
-  if(!pindexLast->nEffectiveBurnCoins)
+  if(!pindexBack->nEffectiveBurnCoins)
     return CBigNum(0).GetCompact();
 
   CBigNum bnNew(~uint256(0));
 
-  bnNew = (bnNew * (BURN_CONSTANT / pindexLast->nEffectiveBurnCoins)) * BURN_HARDER_TARGET;
+  bnNew = (bnNew * (BURN_CONSTANT / pindexBack->nEffectiveBurnCoins)) * BURN_HARDER_TARGET;
   
   return bnNew.GetCompact();
 }
@@ -1824,7 +1833,9 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //GetProofOfBurnReward is not fully made, uses GetPoWReward inside
 //
-//Test getburndata in bitcoinapi and commit!
+//Changed getNextBurnTarget to get the nBurnBits from past blocks based on BURN_MIN_CONFIRMS
+// test BURN_MIN_CONFIRMS that is not 1 with weather when new coins are burnded, 
+//      they will not be factored into the difficulty
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -1922,7 +1933,7 @@ bool CBlock::CheckBlock() const
   int64 calcEffCoins;
   // The effective burn coins have to match, regardless of what block type it is
   if(!CheckBurnEffectiveCoins(&calcEffCoins))
-    return DoS(50, error("CheckBlock() : Effective burn coins calculation failed: %"PRI64d" != %"PRI64d,
+    return DoS(50, error("CheckBlock() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d,
                          nEffectiveBurnCoins, calcEffCoins));
 
   // Check proof of work matches claimed amount

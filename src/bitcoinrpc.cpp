@@ -1073,6 +1073,7 @@ Value getburndata(const Array &params, bool fHelp)
   Object entry;
   entry.push_back(Pair("Net Burnt Coins", ValueFromAmount(netBurnCoins)));
   entry.push_back(Pair("Effective Burnt Coins", ValueFromAmount(nEffBurnCoins)));
+  entry.push_back(Pair("Decayed Burnt Coins", ValueFromAmount(netBurnCoins - nEffBurnCoins)));
   ret.push_back(entry);
   return ret;
 }

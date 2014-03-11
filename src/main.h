@@ -106,11 +106,11 @@ extern int64 nTransactionFee;
 const CBitcoinAddress burnOfficialAddress("1111111111111111111111111111111111");
 const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
-#define BURN_CONSTANT     .01 * CENT
-#define BURN_HASH_DOUBLE  1000.0  //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
-#define BURN_DECAY_RATE   1.000693388 //the growth rate of the hash (2 ** (1 / BURN_HASH_DOUBLE)) rounded up
-#define BURN_HASH_COUNT   1000    //the amount of hashes to be done when getting the smallest hash
-#define BURN_MIN_CONFIRMS 1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
+#define BURN_CONSTANT      .01 * CENT
+#define BURN_HASH_DOUBLE   1000.0  //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
+#define BURN_DECAY_RATE    1.000693388 //the growth rate of the hash (2 ** (1 / BURN_HASH_DOUBLE)) rounded up
+#define BURN_HASH_COUNT    1000    //the amount of hashes to be done when getting the smallest hash
+#define BURN_MIN_CONFIRMS  1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
 #define BURN_HARDER_TARGET 0.6    //make the burn target 0.6 times the intermediate calculated target
 
 //keeps things safe
