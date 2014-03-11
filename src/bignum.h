@@ -524,6 +524,15 @@ inline const CBigNum operator/(const CBigNum& a, const CBigNum& b)
 //not the most efficient way, but get the job done
 inline const CBigNum operator*(const CBigNum& a, const double b)
 {
+
+  //don't deal with special cases, only 0 < b < 1
+  if(!b)
+    return 0;
+  else if(b == 1)
+    return a;
+  else if(b < 0 || b > 1)
+    return a * CBigNum((int64)b);
+
   const uint64 denomintator = -1;
   const uint64 numerator = b * denomintator;
   return (a / CBigNum(denomintator)) * CBigNum(numerator);

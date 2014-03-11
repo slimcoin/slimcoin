@@ -1824,7 +1824,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //GetProofOfBurnReward is not fully made, uses GetPoWReward inside
 //
-//FIX: SlimcoinAfterBurner throws a std::bad_alloc, it is in the for loop in HashAllBurntTx()
+//Test getburndata in bitcoinapi and commit!
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -1919,9 +1919,11 @@ bool CBlock::CheckBlock() const
   if(vtx.empty() || vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
     return DoS(100, error("CheckBlock() : size limits failed"));
 
+  int64 calcEffCoins;
   // The effective burn coins have to match, regardless of what block type it is
-  if(!CheckBurnEffectiveCoins())
-    return DoS(50, error("CheckBlock() : Effective burn coins calculation failed"));
+  if(!CheckBurnEffectiveCoins(&calcEffCoins))
+    return DoS(50, error("CheckBlock() : Effective burn coins calculation failed: %"PRI64d" != %"PRI64d,
+                         nEffectiveBurnCoins, calcEffCoins));
 
   // Check proof of work matches claimed amount
   if(IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
@@ -2133,7 +2135,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
       mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
   }
 
-  CBlockIndex* pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
+  CBlockIndex *pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
   if(pcheckpoint && pblock->hashPrevBlock != hashBestChain && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
   {
     // Extra checks to prevent "fill up memory by spamming with bogus blocks"
@@ -2147,8 +2149,16 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
     {
       if(pfrom)
         pfrom->Misbehaving(100);
-      return error("ProcessBlock() : block with too little %s", 
-                   pblock->IsProofOfStake() ? "proof-of-stake" : "proof-of-work");
+      
+      string block_type;
+      if(pblock->IsProofOfBurn())
+        block_type = "proof-of-burn";
+      else if(pblock->IsProofOfStake())
+        block_type = "proof-of-stake";
+      else //proof of work block
+        block_type = "proof-of-work";
+
+      return error("ProcessBlock() : block with too little %s", block_type.c_str());
     }
   }
 
@@ -2160,7 +2170,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   if(!mapBlockIndex.count(pblock->hashPrevBlock))
   {
     printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
-    CBlock* pblock2 = new CBlock(*pblock);
+    CBlock *pblock2 = new CBlock(*pblock);
 
     // slimcoin: check proof-of-stake
     if(pblock2->IsProofOfStake())
@@ -2273,7 +2283,7 @@ bool CBlock::CheckBlockSignature() const
   return false;
 }
 
-bool CBlock::CheckBurnEffectiveCoins() const
+bool CBlock::CheckBurnEffectiveCoins(int64 *calcEffCoinsRet) const
 {
   //Genesis Block
   if(!hashPrevBlock)
@@ -2296,8 +2306,12 @@ bool CBlock::CheckBurnEffectiveCoins() const
       nBurnedCoins += tx.vout[burnOutTxIndex].nValue;
   }
 
+  int64 calcEffCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
+  if(calcEffCoinsRet)
+    *calcEffCoinsRet = calcEffCoins;
+
   //the effective coins should equal each other
-  return nEffectiveBurnCoins == (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
+  return nEffectiveBurnCoins == calcEffCoins;
 }
 
 
@@ -4006,28 +4020,8 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
   //start off the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
 
-  //find the burnt transaction
-  const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
-
-  if(!burnAddress.IsValid())
-    return error("ScanBurnHashes: Burn address is invalid");
-
-  CTxOut burnTxOut;
-  BOOST_FOREACH(const CTxOut &txout, burnWTx.vout)
-  {
-    CBitcoinAddress address;
-    if(!ExtractAddress(txout.scriptPubKey, address))
-      continue;
-
-    if(!address.IsValid())
-      continue;
-
-    if(address == burnAddress)
-    {
-      burnTxOut = txout;
-      break;
-    }
-  }
+  //find the burnt out transaction
+  CTxOut burnTxOut = burnWTx.GetBurnOutTx();
 
   //if burnTxOut is still null, that means it did not find a burn transaction in burnWTx
   if(burnTxOut.IsNull())
@@ -4055,8 +4049,7 @@ std::pair<uint256, const CWalletTx> HashAllBurntTx()
       it != pwalletMain->setBurnHashes.end(); ++it)
   {
     CWalletTx tmpWTx = pwalletMain->mapWallet.at(*it);
-    u32int confirms = tmpWTx.GetDepthInMainChain();
-    if(!confirms) //a transaction hash to have atleast some confirmations
+    if(tmpWTx.GetDepthInMainChain() <= BURN_MIN_CONFIRMS) //transaction has to have at least some confirmations
       continue;
 
     uint256 tmpHash;
@@ -4464,25 +4457,29 @@ bool CheckWork(CBlock *pblock, CWallet &wallet, CReserveKey &reservekey)
   if(burnHash > hashBurnTarget && pblock->IsProofOfBurn())
     return error("SlimCoinMiner : proof-of-burn not meeting target");
 
-  //// debug print
+  //// debug prints
   printf("\nSlimCoinMiner:\n");
 
   //It is useful to say what type of block was found
-  if(pblock->IsProofOfWork())
-    printf("New Proof-of-Work block found\n");
+  string block_type;
+  if(pblock->IsProofOfBurn())
+    block_type = "Proof-of-Burn";
   else if(pblock->IsProofOfStake())
-    printf("New Proof-of-Stake block found\n");
-  else if(pblock->IsProofOfBurn())
-    printf("New Proof-of-Burn block found\n");
-  else //if this happens, it is fatally bad
-    return error("SlimCoinMiner : unknown block type found\n");
+    block_type = "Proof-of-Stake";
+  else //proof of work block
+    block_type = "Proof-of-Work";
+
+  printf("New %s block found\n", block_type.c_str());
 
   printf("\n");
 
-  printf("Block hash: %s\n", hash.GetHex().c_str());
-  if(pblock->IsProofOfBurn())   //it is useful to print the burn hash if it is a PoB block
-    printf(" Burn hash: %s\n", burnHash.GetHex().c_str());
-  printf("    Target: %s\n", hashTarget.GetHex().c_str());
+  printf(" Block hash: %s\n", hash.GetHex().c_str());
+  if(pblock->IsProofOfBurn())   //it is useful to print PoB specific information
+  {
+    printf("  Burn hash: %s\n", burnHash.GetHex().c_str());
+     printf("Burn Target: %s\n", hashBurnTarget.GetHex().c_str());
+  }
+  printf("     Target: %s\n", hashTarget.GetHex().c_str());
 
   printf("\n");
 
@@ -4666,7 +4663,7 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
               nLogTime = GetTime();
               printf("%s ", DateTimeStrFormat(GetTime()).c_str());
               printf("hashmeter %3d CPUs %6.0f hash/s\n", vnThreadsRunning[THREAD_MINER], dHashesPerSec);
-              printf("Target: %s\n", hashTarget.ToString().substr(0, 20).c_str());
+              printf("\tPoW Target: %s\n", hashTarget.ToString().c_str());
             }
           }
         }
@@ -4743,13 +4740,6 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       if(!smallestWTx.hashBlock || smallestHash == ~uint256(0))
         continue;
       
-      printf("SlimCoinAfterBurner(): Smallest Hash is %s\n\tby tx %s\n", 
-             smallestHash.ToString().c_str(), smallestWTx.GetHash().ToString().c_str());
-
-      printf("\twith Block height %d, transaction depth %d, vout depth %d\n", 
-             mapBlockIndex.at(smallestWTx.hashBlock)->nHeight, 
-             smallestWTx.nIndex, smallestWTx.GetBurnOutTxIndex());
-
       //
       // Create new block
       //
@@ -4760,7 +4750,17 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       IncrementExtraNonce(pblock.get(), pindexLastBlock, nExtraNonce);
 
       uint256 hashTarget = CBigNum().SetCompact(pblock->nBurnBits).getuint256();
-      printf("\tTartget is %s\n", hashTarget.ToString().c_str());
+
+      printf("SlimCoinAfterBurner():\n");
+      printf("\tSmallest Hash is %s\n", smallestHash.ToString().c_str());
+      printf("\tby tx %s\n", smallestWTx.GetHash().ToString().c_str());
+      printf("\twith Block height %d, transaction depth %d, vout depth %d\n", 
+             mapBlockIndex.at(smallestWTx.hashBlock)->nHeight, 
+             smallestWTx.nIndex, smallestWTx.GetBurnOutTxIndex());
+      printf("\tPoB Tartget is %s\n", hashTarget.ToString().c_str());
+      printf("\tnBurnBits=%08x, nEffectiveBurnCoins=%"PRI64u" (formatted %s)\n",
+                      pblock->nBurnBits, pblock->nEffectiveBurnCoins, 
+                      FormatMoney(pblock->nEffectiveBurnCoins).c_str());
 
       if(smallestHash < hashTarget)
       {

@@ -113,6 +113,11 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 #define BURN_MIN_CONFIRMS 1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
 #define BURN_HARDER_TARGET 0.6    //make the burn target 0.6 times the intermediate calculated target
 
+//keeps things safe
+#if BURN_MIN_CONFIRMS < 1
+#error BURN_MIN_CONFIRMS must be greater than or equal to 1
+#endif
+
 void SlimCoinAfterBurner(CWallet *pwallet);
 bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
                   CTxOut &burnTxOut, uint256 &smallestHashRet);
@@ -128,6 +133,12 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
 
 //Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
 std::pair<uint256, const CWalletTx> HashAllBurntTx();
+
+//Given a number of burnt coins and their depth in the chain, returns the number of effectivly burnt coins
+inline int64 BurnCalcEffectiveCoins(int64 nCoins, s32int depthInChain)
+{
+  return nCoins / pow(BURN_DECAY_RATE, depthInChain);
+}
 
 //////////////////////////////////////////////////////////////////////////////
 /*                              Proof Of Burn                               */
@@ -671,6 +682,16 @@ public:
     return GetBurnOutTxIndex() == -1 ? false : true;
   }
 
+  //if (return value).IsNull() == true, then some error occured
+  CTxOut GetBurnOutTx() const
+  {
+    s32int burnTxOutIndex = GetBurnOutTxIndex();
+    if(burnTxOutIndex == -1)
+      return CTxOut(); //error
+
+    return vout[burnTxOutIndex];
+  }
+
   /** Amount of bitcoins coming in to this transaction
       Note that lightweight clients may not know anything besides the hash of previous transactions,
       so may not be able to calculate this.
@@ -1105,7 +1126,7 @@ public:
     return vtx[0].vout[0].scriptPubKey.comparePubKeySignature(indexTxScript);
   }
 
-  bool CheckBurnEffectiveCoins() const;
+  bool CheckBurnEffectiveCoins(int64 *calcEffCoinsRet = NULL) const;
 
   //PoB
 
@@ -1280,14 +1301,15 @@ public:
 
   void print() const
   {
-    printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%d, vchBlockSig=%s)\n",
+    printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%d, vchBlockSig=%s nBurnBits=%08x nEffectiveBurnCoins=%"PRI64u" (formatted %s))\n",
            GetHash().ToString().substr(0,20).c_str(),
            nVersion,
            hashPrevBlock.ToString().substr(0,20).c_str(),
            hashMerkleRoot.ToString().substr(0,10).c_str(),
            nTime, nBits, nNonce,
            vtx.size(),
-           HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str());
+           HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str(),
+           nBurnBits, nEffectiveBurnCoins, FormatMoney(nEffectiveBurnCoins).c_str());
     for (unsigned int i = 0; i < vtx.size(); i++)
     {
       printf("  ");
@@ -1589,7 +1611,7 @@ public:
 
   std::string ToString() const
   {
-    return strprintf("CBlockIndex(nprev=%08x, pnext=%08x, nFile=%d, nBlockPos=%-6d nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), nStakeModifier=%016"PRI64x", nStakeModifierChecksum=%08x, hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, hashBlock=%s)",
+    return strprintf("CBlockIndex(nprev=%08x, pnext=%08x, nFile=%d, nBlockPos=%-6d nHeight=%d, nMint=%s, nMoneySupply=%s, nFlags=(%s)(%d)(%s), nStakeModifier=%016"PRI64x", nStakeModifierChecksum=%08x, hashProofOfStake=%s, prevoutStake=(%s), nStakeTime=%d merkle=%s, hashBlock=%s, nBurnBits=%08x nEffectiveBurnCoins=%"PRI64u" (formatted %s))",
                      pprev, pnext, nFile, nBlockPos, nHeight,
                      FormatMoney(nMint).c_str(), FormatMoney(nMoneySupply).c_str(),
                      GeneratedStakeModifier() ? "MOD" : "-", GetStakeEntropyBit(), IsProofOfStake()? "PoS" : "PoW",
@@ -1597,7 +1619,8 @@ public:
                      hashProofOfStake.ToString().c_str(),
                      prevoutStake.ToString().c_str(), nStakeTime,
                      hashMerkleRoot.ToString().substr(0,10).c_str(),
-                     GetBlockHash().ToString().substr(0,20).c_str());
+                     GetBlockHash().ToString().substr(0,20).c_str(),
+                     nBurnBits, nEffectiveBurnCoins, FormatMoney(nEffectiveBurnCoins).c_str());
   }
 
   void print() const

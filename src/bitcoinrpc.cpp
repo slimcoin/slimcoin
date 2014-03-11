@@ -103,8 +103,7 @@ Value ValueFromAmount(int64 amount)
   return (double)amount / (double)COIN;
 }
 
-std::string
-HexBits(unsigned int nBits)
+std::string HexBits(unsigned int nBits)
 {
   union {
     int32_t nBits;
@@ -970,7 +969,10 @@ Value calcburnhash(const Array &params, bool fHelp)
 
   output += "Smallest Hash is:   " + smallestHash.GetHex() + "\n";
   output += "By transaction id:  " + smallestWTx.GetHash().GetHex() + "\n";
-  output += "Target is about:    " + CBigNum().SetCompact(pindexBest->nBits).getuint256().GetHex();
+  output += "Target:             " + CBigNum().SetCompact(pindexBest->nBurnBits).getuint256().GetHex() + "\n";
+  output += strprintf("nBurnBits=%08x, nEffectiveBurnCoins=%"PRI64u" (formatted %s)",
+                      pindexBest->nBurnBits, pindexBest->nEffectiveBurnCoins, 
+                      FormatMoney(pindexBest->nEffectiveBurnCoins).c_str());
 
   return output;
 }
@@ -1038,6 +1040,41 @@ Value burncoins(const Array &params, bool fHelp)
     throw JSONRPCError(-4, strError);
 
   return wtx.GetHash().GetHex();
+}
+
+Value getburndata(const Array &params, bool fHelp)
+{
+  if(fHelp)
+    throw runtime_error("getburndata\n"
+                        "Lists useful proof-of-burn information");
+  Array ret;
+  int64 netBurnCoins = 0, nEffBurnCoins = 0;
+
+  BOOST_FOREACH(const uint256 &hash, pwalletMain->setBurnHashes)
+  {
+    Object entry;
+    const CWalletTx &wtx = pwalletMain->mapWallet[hash];
+    CTxOut outTx = wtx.GetBurnOutTx();
+
+    if(outTx.IsNull())
+      continue;
+    
+    //fill the entry
+    entry.push_back(Pair("burned amount", ValueFromAmount(outTx.nValue)));
+    WalletTxToJSON(wtx, entry);
+
+    //record the burnt coins
+    netBurnCoins += outTx.nValue;
+    nEffBurnCoins += BurnCalcEffectiveCoins(outTx.nValue, wtx.GetDepthInMainChain());
+
+    ret.push_back(entry);
+  }
+
+  Object entry;
+  entry.push_back(Pair("Net Burnt Coins", ValueFromAmount(netBurnCoins)));
+  entry.push_back(Pair("Effective Burnt Coins", ValueFromAmount(nEffBurnCoins)));
+  ret.push_back(entry);
+  return ret;
 }
 
 Value sendfrom(const Array &params, bool fHelp)
@@ -2434,6 +2471,7 @@ static const CRPCCommand vRPCCommands[] =
   { "burncoins",                &burncoins,              false  },
   { "getblockcount",            &getblockcount,          true   },
   { "getblocknumber",           &getblocknumber,         true   },
+  { "getburndata",              &getburndata,            true   },
   { "getconnectioncount",       &getconnectioncount,     true   },
   { "getdifficulty",            &getdifficulty,          true   },
   { "getgenerate",              &getgenerate,            true   },

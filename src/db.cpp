@@ -636,7 +636,7 @@ bool CTxDB::LoadBlockIndex()
       if(pTestBlkIndex->IsProofOfBurn())
       {
         uint256 burnHashRet;
-        //nHeight - 1 since we want the blockindex before this one
+        //nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
                     pTestBlkIndex->burnCTxOut, burnHashRet);
         if(!CheckProofOfBurn(burnHashRet, pTestBlkIndex->nBurnBits))
