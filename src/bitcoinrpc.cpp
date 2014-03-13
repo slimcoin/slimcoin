@@ -946,10 +946,11 @@ Value calcburnhash(const Array &params, bool fHelp)
   if(params.size() > 0)
     fPrintRegardless = params[0].get_bool();
 
+  s32int burnNonce;
   uint256 smallestHash;
   CWalletTx smallestWTx;
   
-  tie(smallestHash, smallestWTx) = HashAllBurntTx();
+  HashAllBurntTx(burnNonce, smallestHash, smallestWTx);
 
   string output = "";
   if(smallestHash == ~uint256(0))
@@ -997,19 +998,6 @@ Value burncoins(const Array &params, bool fHelp)
     throw JSONRPCError(-5, "Invalid slimcoin burnAddress");
 
   int64 nAmount = AmountFromValue(params[1]);
-
-  if(nAmount != 3 * COIN && nAmount < 25 * COIN)
-  {
-    uint256 smallestHash;
-    CWalletTx smallestWTx;
-
-    tie(smallestHash, smallestWTx) = HashAllBurntTx();
-
-    printf("=============================Smallest Hash is this %s\n\tby tx %s\n", 
-           smallestHash.ToString().c_str(), smallestWTx.GetHash().ToString().c_str());
-    printf("\tTarget is about %s\n", CBigNum().SetCompact(pindexBest->nBits).getuint256().ToString().c_str());
-    return true;
-  }
 
   if(nAmount < MIN_TXOUT_AMOUNT)
     throw JSONRPCError(-101, "Send amount too small");

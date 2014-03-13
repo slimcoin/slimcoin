@@ -602,6 +602,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->burnBlkHeight  = diskindex.burnBlkHeight;
         pindexNew->burnCTx        = diskindex.burnCTx;
         pindexNew->burnCTxOut     = diskindex.burnCTxOut;
+        pindexNew->burnNonce      = diskindex.burnNonce;
         pindexNew->nEffectiveBurnCoins = diskindex.nEffectiveBurnCoins;
         pindexNew->nBurnBits      = diskindex.nBurnBits;
 
@@ -638,7 +639,7 @@ bool CTxDB::LoadBlockIndex()
         uint256 burnHashRet;
         //nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                    pTestBlkIndex->burnCTxOut, burnHashRet);
+                    pTestBlkIndex->burnCTxOut, const_cast<s32int&>(pTestBlkIndex->burnNonce), burnHashRet);
         if(!CheckProofOfBurn(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
       }

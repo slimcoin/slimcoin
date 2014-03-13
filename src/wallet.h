@@ -614,7 +614,7 @@ CWalletTx(const CWallet* pwalletIn, const CTransaction& txIn) : CMerkleTx(txIn)
     return true;
   }
 
-  void GetBurnTxCoords(s32int &blkHeightRet, s32int &txIndexRet, s32int &outTxIndexRet) const
+  void SetBurnTxCoords(s32int &blkHeightRet, s32int &txIndexRet, s32int &outTxIndexRet) const
   {
     std::map<uint256, CBlockIndex*>::iterator it = mapBlockIndex.find(hashBlock);
     if(it == mapBlockIndex.end())

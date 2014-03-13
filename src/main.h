@@ -9,6 +9,7 @@
 #include "bignum.h"
 #include "net.h"
 #include "script.h"
+#include <math.h>       /* pow */
 
 #ifdef WIN32
 #include <io.h> /* for _commit */
@@ -120,11 +121,11 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 void SlimCoinAfterBurner(CWallet *pwallet);
 bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
-                  CTxOut &burnTxOut, uint256 &smallestHashRet);
+                  CTxOut &burnTxOut, s32int &burnNonce, uint256 &smallestHashRet);
 bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet);
-bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet);
+                 s32int burnCTxOut, s32int &burnNonce, uint256 &smallestHashRet);
+bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
+                 s32int burnCTxOut, s32int &burnNonce, uint256 &smallestHashRet);
 bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 
                             CBlock &blockRet, CTransaction &txRet, CTxOut &txOutRet);
 
@@ -132,7 +133,7 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
 
 //Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
-std::pair<uint256, const CWalletTx> HashAllBurntTx();
+void HashAllBurntTx(s32int &burnNonceRet, uint256 &smallestHashRet, CWalletTx &smallestWTxRet);
 
 //Given a number of burnt coins and their depth in the chain, returns the number of effectivly burnt coins
 inline int64 BurnCalcEffectiveCoins(int64 nCoins, s32int depthInChain)
@@ -161,7 +162,8 @@ void PrintBlockTree();
 bool ProcessMessages(CNode* pfrom);
 bool SendMessages(CNode* pto, bool fSendTrickle);
 void GenerateSlimcoins(bool fGenerate, CWallet* pwallet);
-CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, const CWalletTx *burnWalletTx=NULL);
+CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, 
+                       std::pair<const CWalletTx*, s32int> *burnPair=NULL);
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
@@ -1013,6 +1015,7 @@ public:
   s32int burnBlkHeight;
   s32int burnCTx;
   s32int burnCTxOut;
+  s32int burnNonce;
   int64 nEffectiveBurnCoins;
   u32int nBurnBits;
 
@@ -1050,6 +1053,7 @@ public:
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
+      READWRITE(burnNonce);
       READWRITE(nEffectiveBurnCoins);
       READWRITE(nBurnBits);
 
@@ -1077,7 +1081,7 @@ public:
 
     //proof of burn defaults
     fProofOfBurn = false;
-    burnBlkHeight = burnCTx = burnCTxOut = -1; //set indexes to negative
+    burnBlkHeight = burnCTx = burnCTxOut = burnNonce = -1; //set indexes to negative
     nEffectiveBurnCoins = 0;
     nBurnBits = 0;
 
@@ -1103,11 +1107,11 @@ public:
     if(!IsProofOfBurn())
       return ~uint256(0);
 
-    uint256 hash;
-    if(!::GetBurnHash(hashPrevBlock, burnBlkHeight, burnCTx, burnCTxOut, hash))
+    uint256 hashRet;
+    if(!::GetBurnHash(hashPrevBlock, burnBlkHeight, burnCTx, burnCTxOut, const_cast<s32int&>(burnNonce), hashRet))
       return ~uint256(0);
 
-    return hash;
+    return hashRet;
   }
   
   //check this block's coinbase public key signature with that of the given transaction index
@@ -1161,7 +1165,7 @@ public:
 
   bool IsProofOfBurn() const
   {
-    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0;
+    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0 && burnNonce >= 0;
   }
 
   bool IsProofOfWork() const
@@ -1390,6 +1394,7 @@ public:
   s32int burnBlkHeight;
   s32int burnCTx;
   s32int burnCTxOut;
+  s32int burnNonce;
   int64 nEffectiveBurnCoins;
   u32int nBurnBits;
 
@@ -1422,6 +1427,7 @@ public:
     burnBlkHeight  = -1;
     burnCTx        = -1;
     burnCTxOut     = -1;
+    burnNonce      = -1;
     nEffectiveBurnCoins = 0;
     nBurnBits      = 0;
   }
@@ -1463,6 +1469,7 @@ public:
     burnBlkHeight  = block.burnBlkHeight;
     burnCTx        = block.burnCTx;
     burnCTxOut     = block.burnCTxOut;
+    burnNonce      = block.burnNonce;
     nEffectiveBurnCoins = block.nEffectiveBurnCoins;
     nBurnBits      = block.nBurnBits;
 
@@ -1509,9 +1516,9 @@ public:
 
   bool CheckIndex() const
   {
-    printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
+    printf("%5d ------------------------------- %d %d %d %d %d %d %d %d\n",
            nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
-           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
+           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut, burnNonce);
 
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
@@ -1566,7 +1573,7 @@ public:
 
   bool IsProofOfBurn() const
   {
-    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0;
+    return fProofOfBurn && burnBlkHeight >= 0 && burnCTx >= 0 && burnCTxOut >= 0 && burnNonce >= 0;
   }
 
   bool IsProofOfWork() const
@@ -1689,6 +1696,7 @@ public:
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
+      READWRITE(burnNonce);
       READWRITE(nEffectiveBurnCoins);
       READWRITE(nBurnBits);
       )

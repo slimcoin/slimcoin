@@ -1832,10 +1832,23 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //Somehow fix the thing where many good PoB blocks will be flying in, I feel this will cause a lot of forks
 //
 //GetProofOfBurnReward is not fully made, uses GetPoWReward inside
+//CheckProofOfBurn uses same limit is PoW
 //
 //Changed getNextBurnTarget to get the nBurnBits from past blocks based on BURN_MIN_CONFIRMS
 // test BURN_MIN_CONFIRMS that is not 1 with weather when new coins are burnded, 
 //      they will not be factored into the difficulty
+//
+//!!!!!!!!!!!!
+//FIX, REORGANIZE freezes, find that bug!
+//!!!!!!!!!!!!
+//
+//NEWER:
+// The above FIX, went away. Also, the nBits does not match because I changed the stuff so
+//    I might need to delete the entire chain, again... sigh.....
+//
+//DO THIS:
+//Add in the block burn indexes, the burnNonce, ie. the 'i' in the CDataStream, record that 'i' in the CBlock
+//    and the CBlock indexes.
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -3073,7 +3086,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     {
       if(fShutdown)
         return true;
-      printf("received getdata for: %s\n", inv.ToString().c_str());
+      printf("received getdata for: %s", inv.ToString().c_str());
 
       if(inv.type == MSG_BLOCK)
       {
@@ -3081,6 +3094,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(inv.hash);
         if(mi != mapBlockIndex.end())
         {
+          //useful to print the nHeight
+          printf("\tnHeight: %d", mi->second->nHeight);
+
           CBlock block;
           block.ReadFromDisk((*mi).second);
           pfrom->PushMessage("block", block);
@@ -3114,6 +3130,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
       // Track requests for our stuff
       Inventory(inv.hash);
+
+      printf("\n");
     }
   }
 
@@ -3271,7 +3289,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     CBlock block;
     vRecv >> block;
 
-    printf("received block %s\n", block.GetHash().ToString().substr(0,20).c_str());
+    printf("received block %s\n", block.GetHash().ToString().substr(0, 20).c_str());
     // block.print();
 
     CInv inv(MSG_BLOCK, block.GetHash());
@@ -3852,8 +3870,11 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
+//Calculates the has with the given input data
+// If burnNonce is < 0, it means to hash all of the possible burn hashes and
+//  assign it the value of the smallest one, else it will hash that one hash at a nonce of burnNonce
 bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
-                  CTxOut &burnTxOut, uint256 &smallestHashRet)
+                  CTxOut &burnTxOut, s32int &burnNonce, uint256 &smallestHashRet)
 {
   //start off the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
@@ -3869,13 +3890,17 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
     return error("HashBurnData(): Burn transaction does not meet minimum number of confirmations %d < %d", 
                  lastBlkHeight - burned_nHeight, BURN_MIN_CONFIRMS);
 
+  //this burn nonce is too large
+  if(burnNonce >= BURN_HASH_COUNT)
+    return error("HashBurnData(): burnNonce is too large %d >= %d", burnNonce, BURN_HASH_COUNT);
+
   //Get the block index for lastBlkHeight
   const CBlockIndex *pindexLast = 0;
 
   //if pindexBest is not set yet, scan through the entire map
   if(!pindexBest)
   {
-    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& index, mapBlockIndex)
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*) &index, mapBlockIndex)
     {
       const CBlockIndex *pTestBlkIndex = index.second;
       if(pTestBlkIndex->nHeight == lastBlkHeight)
@@ -3906,9 +3931,29 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
   const CBigNum bnMax(~uint256(0));
   CBigNum bnTest;
 
+  //if the burnNonce is >= 0, then hash at that one nonce only
+  if(burnNonce >= 0)
+  {
+    //package the data to be hashed and hash
+    CDataStream ss(SER_GETHASH, 0);
+    ss << burnHashBlock << burnTx.GetHash() << pindexLast->GetBlockHash() << pindexLast->nHeight << burnNonce;
+    CBigNum bnHash(Hash(ss.begin(), ss.end()));
+    
+    //apply the multiplier
+    bnTest = bnHash * multiplier;
+
+    //if bnTest fits in 256 bits, assign it, if it does not, leave smallestHashRet as is, 
+    // it is set to ~uint256(0) at the top of this function
+    if(bnTest < bnMax)
+      smallestHashRet = bnTest.getuint256();
+    
+    //Sucess!
+    return true;
+  }
+
   // Calculate hashes
   u32int i;
-  for(i = 0; i < BURN_HASH_COUNT; i--)
+  for(i = 0; i < BURN_HASH_COUNT; i++)
   {
     //package the data to be hashed and hash
     CDataStream ss(SER_GETHASH, 0);
@@ -3922,8 +3967,13 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
     if(bnTest > bnMax)
       continue;
 
+    //if the bnTest is less than the current smallest Hash, give smallestHashRet the smaller value 
+    // and assign burnNonce the value of 'i'
     if(bnTest < CBigNum(smallestHashRet))
+    {
       smallestHashRet = bnTest.getuint256();
+      burnNonce = i;
+    }
   }
 
   //impossible, usually occurs if the multiplier is so small that it is interpreted as a 0
@@ -3938,8 +3988,10 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
 }
 
 //Gets the hash for PoB given only the indexes
+// If burnNonce is < 0, it means to hash all of the possible burn hashes and
+//  assign it the value of the smallest one, else it will hash that one hash at a nonce of burnNonce
 bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet)
+                 s32int burnCTxOut, s32int &burnNonce, uint256 &smallestHashRet)
 {
   //make the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
@@ -3977,29 +4029,30 @@ bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
   if(!burnTxOut.nValue)
     return error("GetBurnHash(): Burn transaction's value is 0");
 
-  //sucess!
-  return HashBurnData(hashBlock, lastBlkHeight, burnTx, burnTxOut, smallestHashRet);
+  //passed all sanity checks, now do the actuall hashing
+  return HashBurnData(hashBlock, lastBlkHeight, burnTx, burnTxOut, burnNonce, smallestHashRet);
 }
 
 //Gets the hash for PoB given only the indexes and a hashBlock, the best block at the time
-// hashBlock is usually pblock->hashPrevBlock when creating pblock since the previous is the best accepted block
-bool GetBurnHash(uint256 hashBlock, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet)
+// If burnNonce is < 0, it means to hash all of the possible burn hashes and
+//  assign it the value of the smallest one, else it will hash that one hash at a nonce of burnNonce
+bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
+                 s32int burnCTxOut, s32int &burnNonce, uint256 &smallestHashRet)
 {
   //make the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
 
   //the hashBlock must appear in the mapBlockIndex
-  if(!mapBlockIndex.count(hashBlock))
-    return error("GetBurnHash(): Block hash %s not found in mapBlockIndex", hashBlock.ToString().c_str());
+  if(!mapBlockIndex.count(hashPrevBlock))
+    return error("GetBurnHash(): Block hash %s not found in mapBlockIndex", hashPrevBlock.ToString().c_str());
 
-  s32int last_nHeight = mapBlockIndex[hashBlock]->nHeight;  
+  s32int last_nHeight = mapBlockIndex[hashPrevBlock]->nHeight;  
 
-  return GetBurnHash(last_nHeight, burnBlkHeight, burnCTx, burnCTxOut, smallestHashRet);
+  return GetBurnHash(last_nHeight, burnBlkHeight, burnCTx, burnCTxOut, burnNonce, smallestHashRet);
 }
 
 //Scans all of the hashes of this transaction and returns the smallest one
-bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
+bool ScanBurnHashes(const CWalletTx &burnWTx, s32int &burnNonceRet, uint256 &smallestHashRet)
 {
   /*slimcoin: a hash is calculated by:
    * hash = (c / b) * 2 ** ((last_BlkNHeight - burned_BlkNHeight) / E) * [Hash]
@@ -4011,12 +4064,12 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
    *        E = BURN_HASH_DOUBLE, an exponential constant which causes 
    *                                   burnt coins to produce slightly larger hashes as time passes
    *
-   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestBlock ++ bestNHeight ++ iterator)
+   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestBlock ++ bestNHeight ++ nonce)
    *        Where: burntBlockHash = the hash of the block the transaction is found ing
    *               burnTx.GetHash() = the hash of this transaction
    *               hashBestBlock = the hash of the best non-proof-of-burn block in the chain at the time of hashing
    *               bestNHeight = the height of the best non-proof-of-burn block in the chain at the time of hashing
-   *               iterator = an integer 'x' where 0 <= x < BURN_HASH_CONSTANT
+   *               nonce = an integer 'x' where 0 <= x < BURN_HASH_CONSTANT
    */
 
   //check if the transaction is old enough
@@ -4025,9 +4078,12 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
 
   //check if the wallet transaction has a block hash connected to it
   if(!burnWTx.hashBlock)
-    return error("ScanBurnHashes: burnWtx.hashBlock == 0, the transaction has %d confirmations", 
+    return error("ScanBurnHashes: burnWTx.hashBlock == 0, the transaction has %d confirmations", 
                  burnWTx.GetDepthInMainChain());
 
+  //set burnNonceRet to -1, meaning HashBurnData will go through all of the possible hashes and 
+  // assign it the nonce of the best hash
+  burnNonceRet = -1;
   //start off the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
 
@@ -4041,19 +4097,20 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
   if(!burnTxOut.nValue)
     return error("ScanBurnHashes: Burn transaction's value is 0");
 
-  //success!
-  return HashBurnData(burnWTx.hashBlock, pindexBest->nHeight, (CTransaction&)burnWTx, burnTxOut, smallestHashRet);
+  //passed all sanity checks, now do the actual hashing
+  return HashBurnData(burnWTx.hashBlock, pindexBest->nHeight, (CTransaction&)burnWTx, 
+                      burnTxOut, burnNonceRet, smallestHashRet);
 }
 
-std::pair<uint256, const CWalletTx> HashAllBurntTx()
+//returns the (if found) the nonce that produced the best hash, the best hash, with the transaction that produced it
+void HashAllBurntTx(s32int &burnNonceRet, uint256 &smallestHashRet, CWalletTx &smallestWTxRet)
 {
   //give the smallest hash the absolute largest value it can hold
-  uint256 smallestHash(~uint256(0));
-  CWalletTx smallestWTx;
+  smallestHashRet = ~uint256(0);
 
   //if the best index is a proof-of-burn index, do not bother hashing as it will throw errors
   if(pindexBest->IsProofOfBurn())
-    return make_pair(smallestHash, smallestWTx);
+    return;
 
   //go through all of the burnt hashes in the setBurnHashes
   for(set<uint256>::iterator it = pwalletMain->setBurnHashes.begin(); 
@@ -4063,19 +4120,21 @@ std::pair<uint256, const CWalletTx> HashAllBurntTx()
     if(tmpWTx.GetDepthInMainChain() <= BURN_MIN_CONFIRMS) //transaction has to have at least some confirmations
       continue;
 
+    s32int tmpBurnNonce;
     uint256 tmpHash;
-    if(!ScanBurnHashes(tmpWTx, tmpHash))
+    if(!ScanBurnHashes(tmpWTx, tmpBurnNonce, tmpHash))
       continue;
 
-    if(tmpHash < smallestHash)
+    if(tmpHash < smallestHashRet)
     {
-      smallestHash = tmpHash;
-      smallestWTx = tmpWTx;
+      burnNonceRet = tmpBurnNonce;
+      smallestHashRet = tmpHash;
+      smallestWTxRet = const_cast<const CWalletTx&>(tmpWTx);
     }
 
   }
   
-  return make_pair(smallestHash, smallestWTx);
+  return;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -4117,7 +4176,8 @@ int64 nLastCoinStakeSearchInterval = 0;
 
 // CreateNewBlock:
 //   fProofOfStake: try (best effort) to make a proof-of-stake block
-CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *burnWalletTx)
+//   burnPair consists of a pointer to a transactions and the appropriate burnNonce to achieve an adequate hash
+CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, pair<const CWalletTx*, s32int> *burnPair)
 {
   CReserveKey reservekey(pwallet);
 
@@ -4126,16 +4186,18 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
   if(!pblock.get())
     return NULL;
 
-  //if the burnWalletTx is a non-NULL pointer, set the burn coords
-  if(burnWalletTx)
+  //if the burnPair is a non-NULL pointer, set the burn coords
+  if(burnPair)
   {
+    const CWalletTx *burnWalletTx = burnPair->first;
     if(!mapBlockIndex.count(burnWalletTx->hashBlock))
       return NULL;
 
     pblock->fProofOfBurn = true;
-    pblock->burnBlkHeight = mapBlockIndex.at(burnWalletTx->hashBlock)->nHeight;
+    pblock->burnBlkHeight = mapBlockIndex[burnWalletTx->hashBlock]->nHeight;
     pblock->burnCTx = burnWalletTx->nIndex;
     pblock->burnCTxOut = burnWalletTx->GetBurnOutTxIndex();
+    pblock->burnNonce = burnPair->second;
   }
 
   // Create coinbase tx
@@ -4151,6 +4213,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
     CTransaction burnTx;
     CTxOut burnTxOut;
 
+    //given the burn coords in pblock, set the class objects burnBlock, burnTx, burnTxOut
     if(!GetAllTxClassesByIndex(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, 
                                burnBlock, burnTx, burnTxOut))
       return NULL;
@@ -4743,9 +4806,10 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       pindexLastBlock = pindexBest;
       
       //calculate the smallest burn hash
+      s32int burnNonce;
       uint256 smallestHash;
       CWalletTx smallestWTx;
-      tie(smallestHash, smallestWTx) = HashAllBurntTx();
+      HashAllBurntTx(burnNonce, smallestHash, smallestWTx);
 
       //if the smallest hash == 0xfffffffff..., that means there was some sort of error, so continue
       if(!smallestWTx.hashBlock || smallestHash == ~uint256(0))
@@ -4754,7 +4818,8 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       //
       // Create new block
       //
-      auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, false, &smallestWTx));
+      pair<const CWalletTx*, s32int> burnPair(&smallestWTx, burnNonce);
+      auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, false, &burnPair));
       if(!pblock.get())
         return;
 
@@ -4762,6 +4827,7 @@ void SlimCoinAfterBurner(CWallet *pwallet)
 
       uint256 hashTarget = CBigNum().SetCompact(pblock->nBurnBits).getuint256();
 
+      //debug print
       printf("SlimCoinAfterBurner():\n");
       printf("\tSmallest Hash is %s\n", smallestHash.ToString().c_str());
       printf("\tby tx %s\n", smallestWTx.GetHash().ToString().c_str());
@@ -4777,11 +4843,13 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       {
         //Set the PoB flag and indexes
         pblock->fProofOfBurn = true;
-        smallestWTx.GetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
+        smallestWTx.SetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
+        pblock->burnNonce = burnNonce;
 
         //hash it as if it was not our block and test if the hash matches our claimed hash
         uint256 hasher;
-        GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut, hasher);
+        GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, 
+                    pblock->burnCTxOut, pblock->burnNonce, hasher);
 
         if(hasher != smallestHash)
           continue;
