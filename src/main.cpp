@@ -1739,7 +1739,9 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
   bnBestChainTrust = pindexNew->bnChainTrust;
   nTimeBestReceived = GetTime();
   nTransactionsUpdated++;
-  printf("SetBestChain: new best=%s  height=%d  trust=%s  moneysupply=%s\n", hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(), FormatMoney(pindexBest->nMoneySupply).c_str());
+  printf("SetBestChain: new best=%s  height=%d  trust=%s  moneysupply=%s nEffectiveBurnCoins=%s\n", 
+         hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(), 
+         FormatMoney(pindexBest->nMoneySupply).c_str(), FormatMoney(pindexBest->nEffectiveBurnCoins).c_str());
 
   std::string strCmd = GetArg("-blocknotify", "");
 
@@ -3290,7 +3292,8 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     vRecv >> block;
 
     printf("received block %s\n", block.GetHash().ToString().substr(0, 20).c_str());
-    // block.print();
+    
+    block.print();
 
     CInv inv(MSG_BLOCK, block.GetHash());
     pfrom->AddInventoryKnown(inv);
@@ -4098,7 +4101,7 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, s32int &burnNonceRet, uint256 &sma
     return error("ScanBurnHashes: Burn transaction's value is 0");
 
   //passed all sanity checks, now do the actual hashing
-  return HashBurnData(burnWTx.hashBlock, pindexBest->nHeight, (CTransaction&)burnWTx, 
+  return HashBurnData(burnWTx.hashBlock, pindexBest->nHeight, (CTransaction&)burnWTx,
                       burnTxOut, burnNonceRet, smallestHashRet);
 }
 
@@ -4116,7 +4119,10 @@ void HashAllBurntTx(s32int &burnNonceRet, uint256 &smallestHashRet, CWalletTx &s
   for(set<uint256>::iterator it = pwalletMain->setBurnHashes.begin(); 
       it != pwalletMain->setBurnHashes.end(); ++it)
   {
-    CWalletTx tmpWTx = pwalletMain->mapWallet.at(*it);
+    if(!pwalletMain->mapWallet.count(*it))
+      continue;
+
+    CWalletTx tmpWTx = pwalletMain->mapWallet[*it];
     if(tmpWTx.GetDepthInMainChain() <= BURN_MIN_CONFIRMS) //transaction has to have at least some confirmations
       continue;
 
@@ -4850,8 +4856,9 @@ void SlimCoinAfterBurner(CWallet *pwallet)
         uint256 hasher;
         GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, 
                     pblock->burnCTxOut, pblock->burnNonce, hasher);
-
-        if(hasher != smallestHash)
+        
+        //if the two hashes do not match or this block's IsPoB does not trigger, continue
+        if(hasher != smallestHash || !pblock->IsProofOfBurn())
           continue;
 
         //TODO: CTransaction errors out when processing a block, no good, at main.cpp :: 491

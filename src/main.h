@@ -108,11 +108,18 @@ const CBitcoinAddress burnOfficialAddress("1111111111111111111111111111111111");
 const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 #define BURN_CONSTANT      .01 * CENT
-#define BURN_HASH_DOUBLE   1000.0  //the hash of a burnt tx doubles smoothly over the course of 1000 blocks
-#define BURN_DECAY_RATE    1.000693388 //the growth rate of the hash (2 ** (1 / BURN_HASH_DOUBLE)) rounded up
-#define BURN_HASH_COUNT    1000    //the amount of hashes to be done when getting the smallest hash
+
+//The hash of a burnt tx doubles smoothly over the course of 1000 blocks, 
+// do not change this without changing BURN_DECAY_RATE
+#define BURN_HASH_DOUBLE   1000.0 
+
+//The growth rate of the hash (2 ** (1 / BURN_HASH_DOUBLE)) rounded up, 
+// do not change this without changing BURN_HASH_DOUBLE
+#define BURN_DECAY_RATE    1.000693388 
+
+#define BURN_HASH_COUNT    1       //the amount of hashes to be done when getting the smallest hash
 #define BURN_MIN_CONFIRMS  1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
-#define BURN_HARDER_TARGET 0.6    //make the burn target 0.6 times the intermediate calculated target
+#define BURN_HARDER_TARGET 0.5     //make the burn target 0.6 times the intermediate calculated target
 
 //keeps things safe
 #if BURN_MIN_CONFIRMS < 1
@@ -1305,15 +1312,22 @@ public:
 
   void print() const
   {
-    printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%d, vchBlockSig=%s nBurnBits=%08x nEffectiveBurnCoins=%"PRI64u" (formatted %s))\n",
+    printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%d, vchBlockSig=%s)\n",
            GetHash().ToString().substr(0,20).c_str(),
            nVersion,
            hashPrevBlock.ToString().substr(0,20).c_str(),
            hashMerkleRoot.ToString().substr(0,10).c_str(),
            nTime, nBits, nNonce,
            vtx.size(),
-           HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str(),
+           HexStr(vchBlockSig.begin(), vchBlockSig.end()).c_str());
+
+    printf("CBlock General PoB(nBurnBits=%08x nEffectiveBurnCoins=%"PRI64u" (formatted %s))\n", 
            nBurnBits, nEffectiveBurnCoins, FormatMoney(nEffectiveBurnCoins).c_str());
+    
+    if(IsProofOfBurn())
+      printf("CBlock Specific PoB(fProofOfBurn %s, burnBlkHeight %d, burnCTx %d, burnCTxOut %d, burnNonce %d)",
+             fProofOfBurn ? "true" : "false", burnBlkHeight, burnCTx, burnCTxOut, burnNonce);
+
     for (unsigned int i = 0; i < vtx.size(); i++)
     {
       printf("  ");

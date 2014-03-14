@@ -1036,7 +1036,7 @@ Value getburndata(const Array &params, bool fHelp)
     throw runtime_error("getburndata\n"
                         "Lists useful proof-of-burn information");
   Array ret;
-  int64 netBurnCoins = 0, nEffBurnCoins = 0;
+  int64 netBurnCoins = 0, nEffBurnCoins = 0, immatureCoins = 0;
 
   BOOST_FOREACH(const uint256 &hash, pwalletMain->setBurnHashes)
   {
@@ -1049,11 +1049,22 @@ Value getburndata(const Array &params, bool fHelp)
     
     //fill the entry
     entry.push_back(Pair("burned amount", ValueFromAmount(outTx.nValue)));
+    s32int mature = wtx.GetDepthInMainChain() - BURN_MIN_CONFIRMS;
+
+    if(mature < 0)
+      entry.push_back(Pair("Burnt coins still immature, confirmations needed", 
+                           BURN_MIN_CONFIRMS - wtx.GetDepthInMainChain()));
+
     WalletTxToJSON(wtx, entry);
 
     //record the burnt coins
     netBurnCoins += outTx.nValue;
-    nEffBurnCoins += BurnCalcEffectiveCoins(outTx.nValue, wtx.GetDepthInMainChain());
+
+    //if they are mature, add to the nEffBurnCoins, else add to the immatureCoins
+    if(mature >= 0)
+      nEffBurnCoins += BurnCalcEffectiveCoins(outTx.nValue, mature);
+    else
+      immatureCoins += outTx.nValue;
 
     ret.push_back(entry);
   }
@@ -1061,6 +1072,7 @@ Value getburndata(const Array &params, bool fHelp)
   Object entry;
   entry.push_back(Pair("Net Burnt Coins", ValueFromAmount(netBurnCoins)));
   entry.push_back(Pair("Effective Burnt Coins", ValueFromAmount(nEffBurnCoins)));
+  entry.push_back(Pair("Immature Burnt Coins", ValueFromAmount(immatureCoins)));
   entry.push_back(Pair("Decayed Burnt Coins", ValueFromAmount(netBurnCoins - nEffBurnCoins)));
   ret.push_back(entry);
   return ret;
