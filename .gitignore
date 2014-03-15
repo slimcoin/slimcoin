@@ -24,6 +24,7 @@ TAGS
 #compilation and Qt preprocessor part
 *.qm
 Makefile
+slimcoin-qt
 
 #resources cpp
 qrc_*.cpp

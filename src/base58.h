@@ -390,6 +390,7 @@ public:
 
     return fExpectTestNet == fTestNet && vchData.size() == nExpectedSize;
   }
+
   bool IsScript() const
   {
     if (!IsValid())

@@ -946,11 +946,10 @@ Value calcburnhash(const Array &params, bool fHelp)
   if(params.size() > 0)
     fPrintRegardless = params[0].get_bool();
 
-  s32int burnNonce;
   uint256 smallestHash;
   CWalletTx smallestWTx;
   
-  HashAllBurntTx(burnNonce, smallestHash, smallestWTx);
+  HashAllBurntTx(smallestHash, smallestWTx);
 
   string output = "";
   if(smallestHash == ~uint256(0))
@@ -1049,11 +1048,13 @@ Value getburndata(const Array &params, bool fHelp)
     
     //fill the entry
     entry.push_back(Pair("burned amount", ValueFromAmount(outTx.nValue)));
-    s32int mature = wtx.GetDepthInMainChain() - BURN_MIN_CONFIRMS;
+    //Since wtx.GetDepthInMainChain() must be > BURN_MIN_CONFIRMS,
+    // the -1 takes account for the fact that if wtx.GetDepthInMainChain() == BURN_MIN_CONFIRMS,
+    // the burnt tx is still immature
+    s32int mature = wtx.GetDepthInMainChain() - BURN_MIN_CONFIRMS - 1;
 
     if(mature < 0)
-      entry.push_back(Pair("Burnt coins still immature, confirmations needed", 
-                           BURN_MIN_CONFIRMS - wtx.GetDepthInMainChain()));
+      entry.push_back(Pair("Burnt coins immature, confirmations needed", -1 * mature));
 
     WalletTxToJSON(wtx, entry);
 
@@ -1073,7 +1074,7 @@ Value getburndata(const Array &params, bool fHelp)
   entry.push_back(Pair("Net Burnt Coins", ValueFromAmount(netBurnCoins)));
   entry.push_back(Pair("Effective Burnt Coins", ValueFromAmount(nEffBurnCoins)));
   entry.push_back(Pair("Immature Burnt Coins", ValueFromAmount(immatureCoins)));
-  entry.push_back(Pair("Decayed Burnt Coins", ValueFromAmount(netBurnCoins - nEffBurnCoins)));
+  entry.push_back(Pair("Decayed Burnt Coins", ValueFromAmount(netBurnCoins - immatureCoins - nEffBurnCoins)));
   ret.push_back(entry);
   return ret;
 }
