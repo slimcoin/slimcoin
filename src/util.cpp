@@ -1357,7 +1357,7 @@ static void pop_lock()
 {
   if(fDebug) 
   {
-    const CLockLocation& locklocation = (*lockstack).rbegin()->second;
+    const CLockLocation &locklocation = (*lockstack).rbegin()->second;
     printf("Unlocked: %s\n", locklocation.ToString().c_str());
   }
   dd_mutex.lock();

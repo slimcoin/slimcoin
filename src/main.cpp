@@ -1677,8 +1677,7 @@ bool CBlock::SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew)
     if(!txdb.TxnCommit())
       return error("SetBestChain() : TxnCommit failed");
     pindexGenesisBlock = pindexNew;
-  }
-  else if(hashPrevBlock == hashBestChain)
+  }else if(hashPrevBlock == hashBestChain)
   {
     if(!SetBestChainInner(txdb, pindexNew))
       return error("SetBestChain() : SetBestChainInner failed");
@@ -1837,14 +1836,23 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //Somehow fix the thing where many good PoB blocks will be flying in, I feel this will cause a lot of forks
 //
 //GetProofOfBurnReward is not fully made, uses GetPoWReward inside
+//
 //CheckProofOfBurn uses same limit is PoW
 //
 //Changed getNextBurnTarget to get the nBurnBits from past blocks based on BURN_MIN_CONFIRMS
 // test BURN_MIN_CONFIRMS that is not 1 with weather when new coins are burnded, 
 //      they will not be factored into the difficulty
 //
-//THINK: Should I add a fair launch scheme where blocks in the beginning have no reward?
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //
+//fixed the REORGANIZE BLOCK hanging when BurnCheckPubKey(), but not really extensivly tested
+//
+//
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2064,16 +2072,17 @@ bool CBlock::AcceptBlock()
   CBlockIndex* pindexPrev = (*mi).second;
   int nHeight = pindexPrev->nHeight + 1;
 
-  // Check proof-of-work or proof-of-stake
+  // Check proof-of-work or proof-of-stake bits
   if(nBits != GetNextTargetRequired(pindexPrev, IsProofOfStake()))
     return DoS(100, error("AcceptBlock() : incorrect proof-of-work/proof-of-stake nBits"));
 
-  // Check proof-of-burn
+  // Check proof-of-burn bits
   if(nBurnBits != GetNextBurnTargetRequired(pindexPrev))
     return DoS(100, error("AcceptBlock() : incorrect proof-of-burn nBits"));
 
   // Check timestamp against prev
-  if(GetBlockTime() <= pindexPrev->GetMedianTimePast() || GetBlockTime() + nMaxClockDrift < pindexPrev->GetBlockTime())
+  if(GetBlockTime() <= pindexPrev->GetMedianTimePast() || 
+     GetBlockTime() + nMaxClockDrift < pindexPrev->GetBlockTime())
     return error("AcceptBlock() : block's timestamp is too early");
 
   // Check that all transactions are finalized

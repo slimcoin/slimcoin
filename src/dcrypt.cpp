@@ -80,13 +80,9 @@ void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz,
   //copy the data to be extended
   memcpy(extend_array->array + used_array_sz, extend, extend_sz);
 
-  if(hashed_end)
-  {
+  if(hashed_end)   
     *(extend_array->array + used_array_sz + extend_sz) = 0; //add the final \000 of the whole string array
 
-    //reset the static variables
-    actual_array_sz = times_realloced = 0;
-  }
   return;
 }
 

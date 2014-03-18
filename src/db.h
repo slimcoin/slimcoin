@@ -84,6 +84,7 @@ protected:
     // Clear and free memory
     memset(datValue.get_data(), 0, datValue.get_size());
     free(datValue.get_data());
+
     return (ret == 0);
   }
 

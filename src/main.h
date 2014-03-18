@@ -648,9 +648,15 @@ public:
     CTxIn input = vin[0];
     CTransaction prevTx;
 
-    //read the transaction of the prevout
-    if(!prevTx.ReadFromDisk(input.prevout))
-      return false; //if the read disk failed
+    {
+      static CCriticalSection cs;
+      LOCK(cs);
+
+      //read the transaction of the prevout
+      if(!prevTx.ReadFromDisk(input.prevout))
+        return false; //if the read disk failed
+
+    }
 
     scriptPubKeyRet = prevTx.vout[input.prevout.n].scriptPubKey;
 
@@ -1322,7 +1328,7 @@ public:
            nBurnBits, nEffectiveBurnCoins, FormatMoney(nEffectiveBurnCoins).c_str());
     
     if(IsProofOfBurn())
-      printf("CBlock Specific PoB(fProofOfBurn %s, burnBlkHeight %d, burnCTx %d, burnCTxOut %d)",
+      printf("CBlock Specific PoB(fProofOfBurn %s, burnBlkHeight %d, burnCTx %d, burnCTxOut %d)\n",
              fProofOfBurn ? "true" : "false", burnBlkHeight, burnCTx, burnCTxOut);
 
     for (unsigned int i = 0; i < vtx.size(); i++)
@@ -1378,6 +1384,7 @@ public:
   int64 nMoneySupply;
 
   unsigned int nFlags;  // slimcoin: block index flags
+
   enum  
   {
     BLOCK_PROOF_OF_STAKE = (1 << 0), // is proof-of-stake block
@@ -1396,9 +1403,9 @@ public:
   // block header
   int nVersion;
   uint256 hashMerkleRoot;
-  unsigned int nTime;
-  unsigned int nBits;
-  unsigned int nNonce;
+  u32int nTime;
+  u32int nBits;
+  u32int nNonce;
 
   // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
