@@ -45,6 +45,7 @@ static const int64 MIN_TX_FEE = CENT;
 static const int64 MIN_RELAY_TX_FEE = CENT;
 static const int64 MAX_MONEY = 2000000000 * COIN;
 static const int64 MAX_MINT_PROOF_OF_WORK = 250 * COIN;
+static const int64 MAX_MINT_PROOF_OF_BURN = 250 * COIN;
 static const int64 MIN_TXOUT_AMOUNT = MIN_TX_FEE;
 inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 static const int COINBASE_MATURITY_SMC = 500;
@@ -119,7 +120,7 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 #define BURN_HASH_COUNT    1       //the amount of hashes to be done when getting the smallest hash
 #define BURN_MIN_CONFIRMS  1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
-#define BURN_HARDER_TARGET 0.5     //make the burn target 0.6 times the intermediate calculated target
+#define BURN_HARDER_TARGET 0.5     //make the burn target 0.5 times the intermediate calculated target
 
 //keeps things safe
 #if BURN_MIN_CONFIRMS < 1
@@ -175,7 +176,7 @@ void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
 bool CheckProofOfWork(uint256 hash, u32int nBits);
 bool CheckProofOfBurn(uint256 hash, u32int nBurnBits);
-int64 GetProofOfWorkReward(unsigned int nBits);
+int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn=false);
 int64 GetProofOfStakeReward(int64 nCoinAge);
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);
 int GetNumBlocksOfPeers();

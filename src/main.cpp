@@ -36,6 +36,7 @@ map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
+static CBigNum bnProofOfBurnLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007ffff....
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
 int nCoinbaseMaturity = COINBASE_MATURITY_SMC;
@@ -832,12 +833,12 @@ uint256 WantedByOrphan(const CBlock* pblockOrphan)
   return pblockOrphan->hashPrevBlock;
 }
 
-int64 GetProofOfWorkReward(u32int nBits)
+int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn)
 {
-  CBigNum bnSubsidyLimit = MAX_MINT_PROOF_OF_WORK;
+  CBigNum bnSubsidyLimit = fProofOfBurn ? MAX_MINT_PROOF_OF_BURN : MAX_MINT_PROOF_OF_WORK;
   CBigNum bnTarget;
   bnTarget.SetCompact(nBits); //expand the target hash for the current block
-  CBigNum bnTargetLimit = bnProofOfWorkLimit;
+  CBigNum bnTargetLimit = fProofOfBurn ? bnProofOfBurnLimit : bnProofOfWorkLimit;
   bnTargetLimit.SetCompact(bnTargetLimit.GetCompact());
 
   CBigNum bnDiff = bnTargetLimit / bnTarget;
@@ -896,9 +897,9 @@ int64 GetProofOfStakeReward(int64 nCoinAge)
 }
 
 //for now, use the PoW reward for PoB blocks
-int64 GetProofOfBurnReward(u32int nBits)
+int64 GetProofOfBurnReward(u32int nBurnBits)
 {
-  return GetProofOfWorkReward(nBits);
+  return GetProofOfWorkReward(nBurnBits, true);
 }
 
 static const int64 nTargetTimespan = 30 * 60;  // retargets every 30 minutes
@@ -1014,7 +1015,7 @@ bool CheckProofOfBurn(uint256 hash, u32int nBurnBits)
   bnTarget.SetCompact(nBurnBits);
 
   // Check range
-  if(bnTarget <= 0 || bnTarget > bnProofOfWorkLimit)
+  if(bnTarget <= 0 || bnTarget > bnProofOfBurnLimit)
     return error("CheckProofOfBurn() : nBurnBits below minimum work");
 
   // Check proof of work matches claimed amount
@@ -1835,9 +1836,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Somehow fix the thing where many good PoB blocks will be flying in, I feel this will cause a lot of forks
 //
-//GetProofOfBurnReward is not fully made, uses GetPoWReward inside
-//
-//CheckProofOfBurn uses same limit is PoW
+//GetProofOfBurnReward() uses GetPoWReward inside
 //
 //Changed getNextBurnTarget to get the nBurnBits from past blocks based on BURN_MIN_CONFIRMS
 // test BURN_MIN_CONFIRMS that is not 1 with weather when new coins are burnded, 
@@ -1848,7 +1847,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //
 //fixed the REORGANIZE BLOCK hanging when BurnCheckPubKey(), but not really extensivly tested
-//
 //
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2414,6 +2412,7 @@ bool LoadBlockIndex(bool fAllowNew)
   {
     hashGenesisBlock = hashGenesisBlockTestNet;
     bnProofOfWorkLimit = CBigNum(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
+    bnProofOfBurnLimit = CBigNum(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
     nStakeMinAge = 60 * 60 * 24; // test net min age is 1 day
     nCoinbaseMaturity = 60;
     bnInitialHashTarget = CBigNum(~uint256(0) >> 17); //0x00007ffff.....
