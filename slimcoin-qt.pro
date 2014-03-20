@@ -103,6 +103,7 @@ HEADERS += src/qt/bitcoingui.h \
     src/qt/addresstablemodel.h \
     src/qt/optionsdialog.h \
     src/qt/sendcoinsdialog.h \
+    src/qt/burncoinsdialog.h \
     src/qt/addressbookpage.h \
     src/qt/messagepage.h \
     src/qt/aboutdialog.h \

@@ -11,6 +11,7 @@ class TransactionView;
 class OverviewPage;
 class AddressBookPage;
 class SendCoinsDialog;
+class BurnCoinsDialog;
 class MessagePage;
 class Notificator;
 
@@ -26,9 +27,10 @@ class QUrl;
 QT_END_NAMESPACE
 
 /**
-  Bitcoin GUI main class. This class represents the main window of the Bitcoin UI. It communicates with both the client and
-  wallet models to give the user an up-to-date view of the current core state.
+  Bitcoin GUI main class. This class represents the main window of the Bitcoin UI. It communicates with both 
+  the client and wallet models to give the user an up-to-date view of the current core state.
 */
+
 class BitcoinGUI : public QMainWindow
 {
     Q_OBJECT
@@ -63,6 +65,7 @@ private:
     AddressBookPage *addressBookPage;
     AddressBookPage *receiveCoinsPage;
     SendCoinsDialog *sendCoinsPage;
+    BurnCoinsDialog *burnCoinsPage;
     MessagePage *messagePage;
 
     QLabel *labelEncryptionIcon;

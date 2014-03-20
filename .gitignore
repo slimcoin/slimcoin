@@ -30,6 +30,7 @@ slimcoin-qt
 qrc_*.cpp
 #qt creator
 *.pro.user
+qrc_bitcoin.cpp
 
 #mac specific
 .DS_Store

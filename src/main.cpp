@@ -1851,6 +1851,9 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+//
+//On the GUI, make a class that inherits SendCoinsDialog and plop it in
+//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
