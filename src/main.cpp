@@ -974,16 +974,12 @@ static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
 {
   //go back (BURN_MIN_CONFIRMS - 1), -1 since the index passed is -1 from the current already
   const CBlockIndex *pindexBack = pindexLast;
+
   s32int i;
   for(i = 0; i < BURN_MIN_CONFIRMS - 1 && pindexBack; i++)
-  {
     pindexBack = pindexBack->pprev;
-  }
 
-  if(pindexBack == NULL)
-    return CBigNum(0).GetCompact();
-
-  if(!pindexBack->nEffectiveBurnCoins)
+  if(pindexBack == NULL || !pindexBack->nEffectiveBurnCoins)
     return CBigNum(0).GetCompact();
 
   CBigNum bnNew(~uint256(0));
@@ -1013,6 +1009,8 @@ bool CheckProofOfBurn(uint256 hash, u32int nBurnBits)
 {
   CBigNum bnTarget;
   bnTarget.SetCompact(nBurnBits);
+  
+  printf("CPoB hash %s %s\n", hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());   
 
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfBurnLimit)
@@ -1852,7 +1850,12 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //
-//On the GUI, make a class that inherits SendCoinsDialog and plop it in
+//Test GUI burn
+//  Also, the splash screen is bad
+//  burncoinsentry.cpp and .h has a ton of comments, delete them if they are not needed
+//
+//Added premature return true; in CheckProofOfBurn()
+//
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)

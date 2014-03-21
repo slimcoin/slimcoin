@@ -203,10 +203,16 @@ void BitcoinGUI::createActions()
   tabGroup->addAction(receiveCoinsAction);
 
   sendCoinsAction = new QAction(QIcon(":/icons/send"), tr("&Send coins"), this);
-  sendCoinsAction->setToolTip(tr("Send coins to a slimcoin address"));
+  sendCoinsAction->setToolTip(tr("Send coins to a Slimcoin address"));
   sendCoinsAction->setCheckable(true);
   sendCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_2));
   tabGroup->addAction(sendCoinsAction);
+
+  burnCoinsAction = new QAction(QIcon(":/icons/burn"), tr("&Burn coins"), this);
+  burnCoinsAction->setToolTip(tr("Burn coins from a Slimcoin address"));
+  burnCoinsAction->setCheckable(true);
+  burnCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
+  tabGroup->addAction(burnCoinsAction);
 
   messageAction = new QAction(QIcon(":/icons/edit"), tr("Sign &message"), this);
   messageAction->setToolTip(tr("Prove you control an address"));
@@ -225,6 +231,8 @@ void BitcoinGUI::createActions()
   connect(receiveCoinsAction, SIGNAL(triggered()), this, SLOT(gotoReceiveCoinsPage()));
   connect(sendCoinsAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
   connect(sendCoinsAction, SIGNAL(triggered()), this, SLOT(gotoSendCoinsPage()));
+  connect(burnCoinsAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
+  connect(burnCoinsAction, SIGNAL(triggered()), this, SLOT(gotoBurnCoinsPage()));
   connect(messageAction, SIGNAL(triggered()), this, SLOT(showNormalIfMinimized()));
   connect(messageAction, SIGNAL(triggered()), this, SLOT(gotoMessagePage()));
 
@@ -303,6 +311,7 @@ void BitcoinGUI::createToolBars()
   toolbar->addAction(receiveCoinsAction);
   toolbar->addAction(historyAction);
   toolbar->addAction(addressBookAction);
+  toolbar->addAction(burnCoinsAction);
 #ifdef FIRST_CLASS_MESSAGING
   toolbar->addAction(messageAction);
 #endif
@@ -360,6 +369,7 @@ void BitcoinGUI::setWalletModel(WalletModel *walletModel)
     addressBookPage->setModel(walletModel->getAddressTableModel());
     receiveCoinsPage->setModel(walletModel->getAddressTableModel());
     sendCoinsPage->setModel(walletModel);
+    burnCoinsPage->setModel(walletModel);
     messagePage->setModel(walletModel);
 
     setEncryptionStatus(walletModel->getEncryptionStatus());
@@ -401,6 +411,7 @@ void BitcoinGUI::createTrayIcon()
 #endif
   trayIconMenu->addAction(receiveCoinsAction);
   trayIconMenu->addAction(sendCoinsAction);
+  trayIconMenu->addAction(burnCoinsAction);
   trayIconMenu->addSeparator();
   trayIconMenu->addAction(optionsAction);
 #ifndef Q_WS_MAC // This is built-in on Mac
@@ -408,7 +419,7 @@ void BitcoinGUI::createTrayIcon()
   trayIconMenu->addAction(quitAction);
 #endif
 
-  notificator = new Notificator(tr("slimcoin-qt"), trayIcon);
+  notificator = new Notificator(tr("Slimcoin-qt"), trayIcon);
 }
 
 #ifndef Q_WS_MAC
@@ -711,6 +722,15 @@ void BitcoinGUI::gotoSendCoinsPage()
 {
   sendCoinsAction->setChecked(true);
   centralWidget->setCurrentWidget(sendCoinsPage);
+
+  exportAction->setEnabled(false);
+  disconnect(exportAction, SIGNAL(triggered()), 0, 0);
+}
+
+void BitcoinGUI::gotoBurnCoinsPage()
+{
+  burnCoinsAction->setChecked(true);
+  centralWidget->setCurrentWidget(burnCoinsPage);
 
   exportAction->setEnabled(false);
   disconnect(exportAction, SIGNAL(triggered()), 0, 0);

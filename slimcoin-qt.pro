@@ -155,6 +155,7 @@ HEADERS += src/qt/bitcoingui.h \
     src/qt/csvmodelwriter.h \
     src/crypter.h \
     src/qt/sendcoinsentry.h \
+    src/qt/burncoinsentry.h \
     src/qt/qvalidatedlineedit.h \
     src/qt/bitcoinunits.h \
     src/qt/qvaluecombobox.h \
@@ -173,6 +174,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/addresstablemodel.cpp \
     src/qt/optionsdialog.cpp \
     src/qt/sendcoinsdialog.cpp \
+    src/qt/burncoinsdialog.cpp \
     src/qt/addressbookpage.cpp \
     src/qt/messagepage.cpp \
     src/qt/aboutdialog.cpp \
@@ -214,6 +216,7 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/csvmodelwriter.cpp \
     src/crypter.cpp \
     src/qt/sendcoinsentry.cpp \
+    src/qt/burncoinsentry.cpp \
     src/qt/qvalidatedlineedit.cpp \
     src/qt/bitcoinunits.cpp \
     src/qt/qvaluecombobox.cpp \
@@ -230,6 +233,7 @@ RESOURCES += \
 
 FORMS += \
     src/qt/forms/sendcoinsdialog.ui \
+    src/qt/forms/burncoinsdialog.ui \
     src/qt/forms/addressbookpage.ui \
     src/qt/forms/messagepage.ui \
     src/qt/forms/aboutdialog.ui \
@@ -237,6 +241,7 @@ FORMS += \
     src/qt/forms/transactiondescdialog.ui \
     src/qt/forms/overviewpage.ui \
     src/qt/forms/sendcoinsentry.ui \
+    src/qt/forms/burncoinsentry.ui \
     src/qt/forms/askpassphrasedialog.ui
 
 contains(USE_QRCODE, 1) {

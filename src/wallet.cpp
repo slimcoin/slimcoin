@@ -1453,10 +1453,15 @@ bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits,
 }
 
 // Call after CreateTransaction unless you want to abort
-bool CWallet::CommitTransaction(CWalletTx& wtxNew, CReserveKey& reservekey, bool fBurnTx)
+bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey, bool fBurnTx)
 {
   {
     LOCK2(cs_main, cs_wallet);
+    
+    //CommitTransaction will not let a burn transaction not pass of fBurnTx is false
+    if(wtxNew.IsBurnTx() != fBurnTx)
+      return false;
+
     printf("CommitTransaction:\n%s", wtxNew.ToString().c_str());
     {
       // This is only to keep the database open to defeat the auto-flush for the

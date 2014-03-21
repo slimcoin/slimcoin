@@ -79,6 +79,7 @@ private:
     QAction *historyAction;
     QAction *quitAction;
     QAction *sendCoinsAction;
+    QAction *burnCoinsAction;
     QAction *addressBookAction;
     QAction *messageAction;
     QAction *aboutAction;
@@ -144,6 +145,8 @@ private slots:
     void gotoReceiveCoinsPage();
     /** Switch to send coins page */
     void gotoSendCoinsPage();
+    /** Switch to burn coins page */
+    void gotoBurnCoinsPage();
 
     /** Show configuration dialog */
     void optionsClicked();
