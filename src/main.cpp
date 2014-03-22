@@ -1010,8 +1010,6 @@ bool CheckProofOfBurn(uint256 hash, u32int nBurnBits)
   CBigNum bnTarget;
   bnTarget.SetCompact(nBurnBits);
   
-  printf("CPoB hash %s %s\n", hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());   
-
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfBurnLimit)
     return error("CheckProofOfBurn() : nBurnBits below minimum work");
@@ -1852,9 +1850,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test GUI burn
 //  Also, the splash screen is bad
-//  burncoinsentry.cpp and .h has a ton of comments, delete them if they are not needed
-//
-//Added premature return true; in CheckProofOfBurn()
 //
 //
 

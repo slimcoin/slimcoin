@@ -28,24 +28,13 @@ public:
 
     void setValue(const qint64 &value);
 
-    /** Set up the tab chain manually, as Qt messes up the tab chain by default in some cases (issue http://bugreports.qt.nokia.com/browse/QTBUG-10907).
-     */
-    //~ QWidget *setupTabChain(QWidget *prev);
-
     void setFocus();
 
 public slots:
-    //~ void setRemoveEnabled(bool enabled);
     void clear();
 
 signals:
     void removeEntry(BurnCoinsEntry *entry);
-
-private slots:
-    //~ void on_deleteButton_clicked();
-    //~ void on_payTo_textChanged(const QString &address);
-    //~ void on_addressBookButton_clicked();
-    //~ void on_pasteButton_clicked();
 
 private:
     Ui::BurnCoinsEntry *ui;
