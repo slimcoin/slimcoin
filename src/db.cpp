@@ -639,8 +639,6 @@ bool CTxDB::LoadBlockIndex()
         //nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
                     pTestBlkIndex->burnCTxOut, burnHashRet);
-        //~ GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                    //~ pTestBlkIndex->burnCTxOut, burnHashRet);
         if(!CheckProofOfBurn(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
       }
@@ -719,7 +717,7 @@ bool CTxDB::LoadBlockIndex()
 
     // THIS IS MY STUFF
 
-    printf("Block %d has this many transactions in it: %d, Block Pos %d\n", 
+    printf("Block %3d has this many transactions in it: %d, Block Pos %d\n", 
            pindex->nHeight, block.vtx.size(), pindex->nBlockPos);
 
 

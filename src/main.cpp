@@ -291,6 +291,32 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
   return ReadFromDisk(txdb, prevout, txindex);
 }
 
+
+//Returns the pubKet of the first txIn of this tx
+bool CTransaction::GetSendersPubKey(CScript &scriptPubKeyRet) const
+{
+  if(vin.empty())
+    return false;
+    
+  const CTxIn input = vin[0];
+  CTransaction prevTx;
+
+  // First try finding the previous transaction in database
+  CTxDB txdb("r");
+  CTxIndex txindex;
+
+  //read the transaction of the prevout
+  if(!prevTx.ReadFromDisk(txdb, input.prevout, txindex))
+    return false; //if the read disk failed
+
+  txdb.Close();
+
+  scriptPubKeyRet = prevTx.vout[input.prevout.n].scriptPubKey;
+
+  //sucess!
+  return true;
+}
+
 bool CTransaction::IsStandard() const
 {
   BOOST_FOREACH(const CTxIn& txin, vin)
@@ -1016,7 +1042,8 @@ bool CheckProofOfBurn(uint256 hash, u32int nBurnBits)
 
   // Check proof of work matches claimed amount
   if(hash > bnTarget.getuint256())
-    return error("CheckProofOfBurn() : hash doesn't match nBurnBits");
+    return error("CheckProofOfBurn() : hash doesn't match nBurnBits\n\t%s > %s", 
+                 hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());
 
   return true;
 }
@@ -1965,10 +1992,6 @@ bool CBlock::CheckBlock() const
   if(IsProofOfBurn() && !CheckProofOfBurn(GetBurnHash(), nBurnBits))
     return DoS(50, error("CheckBlock() : proof-of-burn failed"));
 
-  // If the block is a PoB, check if the signature of the CTxOut is correct
-  if(IsProofOfBurn() && !BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
-    return DoS(100, error("CheckBlock() : Public signatures do not match with burn transactions's"));
-
   // Check timestamp
   if(GetBlockTime() > GetAdjustedTime() + nMaxClockDrift)
     return error("CheckBlock() : block timestamp too far in the future");
@@ -2154,13 +2177,18 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   if(!pblock->CheckBlock())
     return error("ProcessBlock() : CheckBlock FAILED");
 
+  // If the block is a PoB, check if the signature of the CTxOut is correct
+  if(pblock->IsProofOfBurn())
+    if(!pblock->BurnCheckPubKeys(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut))
+      return error("ProcessBlock() : Public signatures do not match with burn transactions's");
+
   // slimcoin: verify hash target and signature of coinstake tx
   if(pblock->IsProofOfStake())
   {
     uint256 hashProofOfStake = 0;
     if(!CheckProofOfStake(pblock->vtx[1], pblock->nBits, hashProofOfStake))
     {
-      printf("WARNING: ProcessBlock(): check proof-of-stake failed for block %s\n", hash.ToString().c_str());
+      printf("WARNING: ProcessBlock() : check proof-of-stake failed for block %s\n", hash.ToString().c_str());
       return false; // do not error here as we expect this during initial block download
     }
 

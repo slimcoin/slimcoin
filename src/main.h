@@ -120,7 +120,7 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 #define BURN_HASH_COUNT    1       //the amount of hashes to be done when getting the smallest hash
 #define BURN_MIN_CONFIRMS  1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
-#define BURN_HARDER_TARGET 0.5     //make the burn target 0.5 times the intermediate calculated target
+#define BURN_HARDER_TARGET 6     //make the burn target 0.5 times the intermediate calculated target
 
 //keeps things safe
 #if BURN_MIN_CONFIRMS < 1
@@ -641,29 +641,7 @@ public:
   }
 
   //Returns the pubKet of the first txIn of this tx
-  bool GetSendersPubKey(CScript &scriptPubKeyRet) const
-  {
-    if(vin.empty())
-      return false;
-    
-    CTxIn input = vin[0];
-    CTransaction prevTx;
-
-    {
-      static CCriticalSection cs;
-      LOCK(cs);
-
-      //read the transaction of the prevout
-      if(!prevTx.ReadFromDisk(input.prevout))
-        return false; //if the read disk failed
-
-    }
-
-    scriptPubKeyRet = prevTx.vout[input.prevout.n].scriptPubKey;
-
-    //sucess!
-    return true;
-  }
+  bool GetSendersPubKey(CScript &scriptPubKeyRet) const;
 
   //return the index of a burn transaction in vout, -1 if not found
   s32int GetBurnOutTxIndex() const
@@ -1532,9 +1510,9 @@ public:
 
   bool CheckIndex() const
   {
-    printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
-           nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
-           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
+    //~ printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
+           //~ nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
+           //~ fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
 
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
