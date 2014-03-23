@@ -1852,9 +1852,10 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test GUI burn
 //  Also, the splash screen is bad
-//
+//  Figure out how to add bgcoin.png
 //
 //Silenced CTransaction::GetBurnTxOutIndex until official burn address is made
+// Caused a fork, make -rescan option, as it scans, check for PoB addresses and reassign them
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -1950,7 +1951,7 @@ bool CBlock::CheckBlock() const
      ::GetSerializeSize(*this, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
     return DoS(100, error("CheckBlock() : size limits failed"));
 
-  int64 calcEffCoins;
+  int64 calcEffCoins = 0;
   // The effective burn coins have to match, regardless of what block type it is
   if(!CheckBurnEffectiveCoins(&calcEffCoins))
     return DoS(50, error("CheckBlock() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d,
@@ -2360,7 +2361,7 @@ bool CheckDiskSpace(uint64 nAdditionalBytes)
     string strMessage = _("Warning: Disk space is low");
     strMiscWarning = strMessage;
     printf("*** %s\n", strMessage.c_str());
-    ThreadSafeMessageBox(strMessage, "SLIMCoin", wxOK | wxICON_EXCLAMATION | wxMODAL);
+    ThreadSafeMessageBox(strMessage, "Slimcoin", wxOK | wxICON_EXCLAMATION | wxMODAL);
     StartShutdown();
     return false;
   }
