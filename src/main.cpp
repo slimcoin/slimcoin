@@ -1854,6 +1854,8 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //  Also, the splash screen is bad
 //
 //
+//Silenced CTransaction::GetBurnTxOutIndex until official burn address is made
+//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2493,7 +2495,7 @@ bool LoadBlockIndex(bool fAllowNew)
     // hash and also the block's nonce, do not think that is needed but check
 
     // If genesis block hash does not match, then generate new genesis hash
-    if(true && block.GetHash() != hashGenesisBlock)
+    if(false && block.GetHash() != hashGenesisBlock)
     {
       printf("\nScanning for the Genesis Block\n");
 

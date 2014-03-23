@@ -668,12 +668,14 @@ public:
   //return the index of a burn transaction in vout, -1 if not found
   s32int GetBurnOutTxIndex() const
   {
+    return -1;
+
     //find the burnt transaction
     const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
 
     if(!burnAddress.IsValid())
     {
-      printf("CTransaction GetBurnOutTxIndex: Burn address is invalid");
+      printf("CTransaction GetBurnOutTxIndex: Burn address is invalid\n");
       return -1;
     }
 
