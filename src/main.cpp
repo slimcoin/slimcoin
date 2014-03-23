@@ -1838,6 +1838,8 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 // test BURN_MIN_CONFIRMS that is not 1 with weather when new coins are burnded, 
 //      they will not be factored into the difficulty
 //
+//If I plan to change the hashing algo, I will also need to change the checkpoints nStakeModifierChecksum
+//
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -2454,7 +2456,7 @@ bool LoadBlockIndex(bool fAllowNew)
     // Genesis block
     const char *pszTimestamp = "RT: http://rt.com/news/war-gear-ukraine-riot-084/";
     CTransaction txNew;
-    txNew.nTime = 1390500425;
+    txNew.nTime = !fTestNet ? 1395531800 : 1390500425;
     txNew.vin.resize(1);
     txNew.vout.resize(1);
     txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(9999) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2465,16 +2467,20 @@ bool LoadBlockIndex(bool fAllowNew)
     block.hashPrevBlock = 0;
     block.hashMerkleRoot = block.BuildMerkleTree();
     block.nVersion = 1;
-    block.nTime    = !fTestNet ? 1345084287 : 1390500425;
+    block.nTime    = !fTestNet ? 1395531800 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 2179302059u : 63533;
+    block.nNonce   = !fTestNet ? 1223176 : 63533;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
     printf("hashGenesisBlock = %s\n", hashGenesisBlock.ToString().c_str());
     printf("block.hashMerkleRoot = %s\n", block.hashMerkleRoot.ToString().c_str());
 
-    assert(block.hashMerkleRoot == uint256("0xaedeb3ea347476baf75f902017eafc470fe0129d2bb45636b3dc403842921e45"));
+    if(fTestNet)
+      assert(block.hashMerkleRoot == uint256("0xaedeb3ea347476baf75f902017eafc470fe0129d2bb45636b3dc403842921e45"));
+    else
+      assert(block.hashMerkleRoot == uint256("0xa125edf4bf0e6e311cb56aafafd98b4ee49252f77b955cbb389132cd25da4fdd"));
+
     block.print();
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -2487,15 +2493,15 @@ bool LoadBlockIndex(bool fAllowNew)
     // hash and also the block's nonce, do not think that is needed but check
 
     // If genesis block hash does not match, then generate new genesis hash
-    if(false && block.GetHash() != hashGenesisBlock)
+    if(true && block.GetHash() != hashGenesisBlock)
     {
       printf("\nScanning for the Genesis Block\n");
 
       //I also included dcrypt.h up above, be sure of that
-      u32int hashes_done;
+      u32int hashes_done = 0;
       uint256 phash, hashTarget = CBigNum().SetCompact(block.nBits).getuint256();
 
-      for(;;block.nNonce++)
+      for(block.nNonce = 0;; block.nNonce++)
       {
         //if scan does not return -1, then check if the hash is less than the target
         if(ScanDcryptHash(&block, &hashes_done, &phash) != (u32int)-1)
@@ -2520,8 +2526,6 @@ bool LoadBlockIndex(bool fAllowNew)
       printf("NEW block.nTime = %d\n", block.nTime);
       printf("NEW block.nNonce = %d\n", block.nNonce);
       printf("NEW block.GetHash = %s\n", block.GetHash().ToString().c_str());
-
-      //~ assert(false);
 
     }
 

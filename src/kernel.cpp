@@ -23,9 +23,7 @@ unsigned int nModifierInterval = MODIFIER_INTERVAL;
 // Hard checkpoints of stake modifiers to ensure they are deterministic
 static std::map<int, unsigned int> mapStakeModifierCheckpoints =
   boost::assign::map_list_of
-  ( 0, 0x0e00670bu )
-  ( 19080, 0xad4e4d29u )
-  ( 30583, 0xdc7bf136u )
+  ( 0, 0x00c780ff5 )
   ;
 
 // Whether the given coinstake is subject to new v0.3 protocol
@@ -405,10 +403,12 @@ bool CheckCoinStakeTimestamp(int64 nTimeBlock, int64 nTimeTx)
 unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
 {
   assert(pindex->pprev || pindex->GetBlockHash() == hashGenesisBlock);
+
   // Hash previous checksum with flags, hashProofOfStake and nStakeModifier
   CDataStream ss(SER_GETHASH, 0);
   if(pindex->pprev)
     ss << pindex->pprev->nStakeModifierChecksum;
+
   ss << pindex->nFlags << pindex->hashProofOfStake << pindex->nStakeModifier;
   uint256 hashChecksum = Hash(ss.begin(), ss.end());
   hashChecksum >>= (256 - 32);
@@ -416,10 +416,14 @@ unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex)
 }
 
 // Check stake modifier hard checkpoints
-bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum)
+bool CheckStakeModifierCheckpoints(s32int nHeight, u32int nStakeModifierChecksum)
 {
-  if(fTestNet) return true; // Testnet has no checkpoints
+  // Testnet has no checkpoints
+  if(fTestNet) 
+    return true;
+
   if(mapStakeModifierCheckpoints.count(nHeight))
     return nStakeModifierChecksum == mapStakeModifierCheckpoints[nHeight];
+
   return true;
 }
