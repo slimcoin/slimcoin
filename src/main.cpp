@@ -1877,12 +1877,8 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //
-//Test GUI burn
-//  Also, the splash screen is bad
-//  Figure out how to add bgcoin.png
-//
-//Silenced CTransaction::GetBurnTxOutIndex until official burn address is made
-// Caused a fork, make -rescan option, as it scans, check for PoB addresses and reassign them
+//GUI:
+// GUI thinks that PoB blocks are mined until they are comfirmed
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -3919,7 +3915,7 @@ bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &bur
   smallestHashRet = ~uint256(0);
 
   if(!mapBlockIndex.count(burnHashBlock))
-    return error("HashBurnData(): Block hash %s not found in mapBlockIndex", burnHashBlock);
+    return error("HashBurnData(): Block hash %s not found in mapBlockIndex", burnHashBlock.ToString().c_str());
 
   const s32int burned_nHeight = mapBlockIndex[burnHashBlock]->nHeight;
 

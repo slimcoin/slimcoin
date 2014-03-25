@@ -22,9 +22,9 @@
 #include "key.h"
 
 //debug flag for base58 testing
-#define DEBUG_BASE58 false
+//~ #define DEBUG_BASE58 
 
-static const char* pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+static const char *pszBase58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
 // Encode a byte sequence as a base58-encoded string
 inline std::string EncodeBase58(const unsigned char* pbegin, const unsigned char* pend)
@@ -145,7 +145,7 @@ inline std::string EncodeBase58Check(const std::vector<unsigned char>& vchIn)
   return EncodeBase58(vch);
 }
 
-#if DEBUG_BASE58 == true
+#ifdef DEBUG_BASE58
 inline void base58_print_comparison(u8int *one, u8int *two, u32int len)
 {
   u32int i = 0;
@@ -360,7 +360,7 @@ public:
     unsigned int nExpectedSize = 20;
     bool fExpectTestNet = false;
 
-    #if DEBUG_BASE58 == true
+    #ifdef DEBUG_BASE58
     printf("Base58: nVersion is %d\n", nVersion);
     #endif
 
@@ -387,6 +387,10 @@ public:
     default:
       return false;
     }
+
+    #ifdef DEBUG_BASE58
+    printf("Base58: %d == %d, %d == %d\n", fExpectTestNet, fTestNet, vchData.size(), nExpectedSize);
+    #endif
 
     return fExpectTestNet == fTestNet && vchData.size() == nExpectedSize;
   }

@@ -105,7 +105,7 @@ extern int64 nTransactionFee;
 //////////////////////////////////////////////////////////////////////////////
 
 //Burn addresses
-const CBitcoinAddress burnOfficialAddress("1111111111111111111111111111111111");
+const CBitcoinAddress burnOfficialAddress("mmSLiMCoinMainNetworkBurnAddaCsaBL");
 const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 #define BURN_CONSTANT      .01 * CENT
@@ -1510,9 +1510,9 @@ public:
 
   bool CheckIndex() const
   {
-    //~ printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
-           //~ nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
-           //~ fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
+    printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
+           nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
+           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
 
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);

@@ -1625,12 +1625,12 @@ bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo,
                      unsigned int nIn, bool fValidatePayToScriptHash, int nHashType)
 {
   assert(nIn < txTo.vin.size());
-  const CTxIn& txin = txTo.vin[nIn];
+  const CTxIn &txin = txTo.vin[nIn];
 
   if(txin.prevout.n >= txFrom.vout.size())
     return false;
 
-  const CTxOut& txout = txFrom.vout[txin.prevout.n];
+  const CTxOut &txout = txFrom.vout[txin.prevout.n];
 
   if(txin.prevout.hash != txFrom.GetHash())
     return false;

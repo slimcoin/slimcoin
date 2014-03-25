@@ -491,7 +491,7 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
   bool comparePubKeySignature(const CScript &scriptPubKey) const
   {
     //Get the solutions for this CScript
-    vector<valtype> vSolutionsThis;
+    std::vector<valtype> vSolutionsThis;
     txnouttype whichTypeThis;
     if(!Solver(*this, whichTypeThis, vSolutionsThis))
       return false;
@@ -500,7 +500,7 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
       return false;
 
     //Get the solutions for the testing CScript
-    vector<valtype> vSolutionsTesting;
+    std::vector<valtype> vSolutionsTesting;
     txnouttype whichTypeTesting;
     if(!Solver(scriptPubKey, whichTypeTesting, vSolutionsTesting))
       return false;

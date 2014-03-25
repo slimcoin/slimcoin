@@ -894,21 +894,23 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 
   LOCK(csPathCached);
 
-  if(mapArgs.count("-datadir")) {
+  if(mapArgs.count("-datadir")) 
+  {
     path = fs::system_complete(mapArgs["-datadir"]);
-    if(!fs::is_directory(path)) {
+    if(!fs::is_directory(path))
+    {
       path = "";
       return path;
     }
-  } else {
+  }else
     path = GetDefaultDataDir();
-  }
+
   if(fNetSpecific && GetBoolArg("-testnet", false))
     path /= "testnet";
 
   fs::create_directory(path);
 
-  cachedPath[fNetSpecific]=true;
+  cachedPath[fNetSpecific] = true;
   return path;
 }
 

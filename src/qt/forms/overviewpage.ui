@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>552</width>
-    <height>342</height>
+    <height>493</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -122,11 +122,17 @@
      </item>
      <item>
       <widget class="QLabel" name="wallet_bgcoin">
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
        <property name="text">
         <string/>
        </property>
        <property name="pixmap">
-        <pixmap>:/images/wallet_bgcoin</pixmap>
+        <pixmap resource="../bitcoin.qrc">:/icons/wallet_bgcoin</pixmap>
        </property>
        <property name="scaledContents">
         <bool>false</bool>
@@ -135,7 +141,7 @@
         <set>Qt::AlignCenter</set>
        </property>
        <property name="margin">
-        <number>-2</number>
+        <number>50</number>
        </property>
       </widget>
      </item>
@@ -192,6 +198,8 @@
    </item>
   </layout>
  </widget>
- <resources/>
+ <resources>
+  <include location="../bitcoin.qrc"/>
+ </resources>
  <connections/>
 </ui>
