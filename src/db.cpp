@@ -519,7 +519,7 @@ bool CTxDB::WriteCheckpointPubKey(const string& strPubKey)
   return Write(string("strCheckpointPubKey"), strPubKey);
 }
 
-CBlockIndex static * InsertBlockIndex(uint256 hash)
+CBlockIndex static *InsertBlockIndex(uint256 hash)
 {
   if(!hash)
     return NULL;
@@ -637,7 +637,7 @@ bool CTxDB::LoadBlockIndex()
       {
         uint256 burnHashRet;
         //nHeight - 1 since GetBurnHash wants the index of the previous block
-        GetBurnHash(pTestBlkIndex->nHeight - 1, pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
+        GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
                     pTestBlkIndex->burnCTxOut, burnHashRet);
         if(!CheckProofOfBurn(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);

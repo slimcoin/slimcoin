@@ -119,7 +119,7 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 #define BURN_DECAY_RATE    1.000693388 
 
 #define BURN_HASH_COUNT    1       //the amount of hashes to be done when getting the smallest hash
-#define BURN_MIN_CONFIRMS  1       //a burn tx requires atleast x > 1 confimations, BURN_MIN_CONFIMS must be > 0
+#define BURN_MIN_CONFIRMS  6       //a burn tx requires atleast x > 6 confimations, BURN_MIN_CONFIMS must be > 0
 #define BURN_HARDER_TARGET 6     //make the burn target 0.5 times the intermediate calculated target
 
 //keeps things safe
@@ -185,7 +185,7 @@ std::string GetWarnings(std::string strFor);
 uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
 void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake);
-
+CBlockIndex *pindexByHeight(s32int nHeight);
 
 
 
@@ -1003,6 +1003,7 @@ public:
 
   // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
+  uint256 hashBurnBlock;
   s32int burnBlkHeight;
   s32int burnCTx;
   s32int burnCTxOut;
@@ -1040,6 +1041,7 @@ public:
 
       //PoB data
       READWRITE(fProofOfBurn);
+      READWRITE(hashBurnBlock);
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
@@ -1070,6 +1072,7 @@ public:
 
     //proof of burn defaults
     fProofOfBurn = false;
+    hashBurnBlock = 0;
     burnBlkHeight = burnCTx = burnCTxOut = -1; //set indexes to negative
     nEffectiveBurnCoins = 0;
     nBurnBits = 0;
