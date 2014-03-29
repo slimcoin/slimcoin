@@ -128,10 +128,8 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 #endif
 
 void SlimCoinAfterBurner(CWallet *pwallet);
-bool HashBurnData(uint256 burnHashBlock, s32int lastBlkHeight, CTransaction &burnTx,
-                  CTxOut &burnTxOut, uint256 &smallestHashRet);
-bool GetBurnHash(s32int lastBlkHeight, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet);
+bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,
+                  s32int burnBlkHeight, int64 burnValue, uint256 &smallestHashRet);
 bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
                  s32int burnCTxOut, uint256 &smallestHashRet);
 bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 

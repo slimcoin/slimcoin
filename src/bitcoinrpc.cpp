@@ -1076,6 +1076,15 @@ Value getburndata(const Array &params, bool fHelp)
   entry.push_back(Pair("Immature Burnt Coins", ValueFromAmount(immatureCoins)));
   entry.push_back(Pair("Decayed Burnt Coins", ValueFromAmount(netBurnCoins - immatureCoins - nEffBurnCoins)));
   ret.push_back(entry);
+
+  Object info;
+  info.push_back(Pair("General Info", ""));
+  info.push_back(Pair("nBurnBits", strprintf("%08x", pindexBest->nBurnBits)));
+  info.push_back(Pair("nEffectiveBurnCoins", strprintf("%"PRI64u, pindexBest->nEffectiveBurnCoins)));
+  info.push_back(Pair("Formatted nEffectiveBurnCoins", FormatMoney(pindexBest->nEffectiveBurnCoins)));
+                 
+  ret.push_back(info);
+
   return ret;
 }
 

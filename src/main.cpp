@@ -3991,15 +3991,15 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 //////////////////////////////////////////////////////////////////////////////
 
 //Calculates the has with the given input data
-// burnTxHashBlock is the has of the block holding the burn transaction
-// hashPrevBlock is the has of the previous block of the block the hash is being calculated on
+// burnBlockHash is the hash of the block holding the burn transaction
+// hashPrevBlock is the hash of the previous block of the block the hash is being calculated on
+// burnTxHash is the hash of the burn transaction
 // burnBlkHeight is the nHeight of the block holding the burn transaction
-// burnTx is the actual burn transaction
-// burnTxOut is the out transaction of the burn transaction
+// burnValue is the amount of coins burnded
 // 
 // smallestHashRet is the returned proof-of-burn hash 
-bool HashBurnData(uint256 burnTxHashBlock, uint256 hashPrevBlock, s32int burnBlkHeight, 
-                  CTransaction &burnTx, CTxOut &burnTxOut, uint256 &smallestHashRet)
+bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,
+                  s32int burnBlkHeight, int64 burnValue, uint256 &smallestHashRet)
 {
   //start off the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
@@ -4016,7 +4016,7 @@ bool HashBurnData(uint256 burnTxHashBlock, uint256 hashPrevBlock, s32int burnBlk
 
   //calculate the multiplier for the hash, the pow() represents the decay
   // subtracts BURN_MIN_CONFIRMS since the first block the coinst get active should have 100% power
-  const double multiplier = (BURN_CONSTANT / burnTxOut.nValue) * 
+  const double multiplier = (BURN_CONSTANT / burnValue) * 
     pow(2, (lastBlkHeight - burnBlkHeight - BURN_MIN_CONFIRMS) / BURN_HASH_DOUBLE);
 
   //Calculate the burn hash
@@ -4027,7 +4027,7 @@ bool HashBurnData(uint256 burnTxHashBlock, uint256 hashPrevBlock, s32int burnBlk
 
     // package the data to be hashed and hash
     CDataStream ss(SER_GETHASH, 0);
-    ss << burnTxHashBlock << burnTx.GetHash() << hashPrevBlock;
+    ss << burnBlockHash << burnTxHash << hashPrevBlock;
     CBigNum bnHash(Hash(ss.begin(), ss.end()));
     
     //apply the multiplier
@@ -4081,6 +4081,7 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
   if(!burnAddress.IsValid())
     return error("GetBurnHash(): Burn address is invalid");
 
+  //check if the out transaction went to a burn address
   CBitcoinAddress address;
   if(!ExtractAddress(burnTxOut.scriptPubKey, address))
     return error("GetBurnHash(): ExtractAddress failed");
@@ -4095,7 +4096,8 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
     return error("GetBurnHash(): Burn transaction's value is 0");
 
   //passed all sanity checks, now do the actuall hashing
-  return HashBurnData(txHashBlock, hashPrevBlock, burnBlkHeight, burnTx, burnTxOut, smallestHashRet);
+  return HashBurnData(txHashBlock, hashPrevBlock, burnTx.GetHash(), 
+                      burnBlkHeight , burnTxOut.nValue, smallestHashRet);
 }
 
 //Scans all of the hashes of this transaction and returns the smallest one
@@ -4147,8 +4149,8 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
   CBlockIndex *pindex = mapBlockIndex[burnWTx.hashBlock];
 
   //passed all sanity checks, now do the actual hashing
-  return HashBurnData(burnWTx.hashBlock, pindexBest->GetBlockHash(), pindex->nHeight, (CTransaction&)burnWTx,
-                      burnTxOut, smallestHashRet);
+  return HashBurnData(burnWTx.hashBlock, pindexBest->GetBlockHash(), burnWTx.GetHash(), 
+                      pindex->nHeight, burnTxOut.nValue, smallestHashRet);
 }
 
 //returns the (if found) the best hash with the transaction that produced it
@@ -4243,6 +4245,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
       return NULL;
 
     pblock->fProofOfBurn = true;
+    pblock->hashBurnBlock = burnWalletTx->hashBlock;
     pblock->burnBlkHeight = mapBlockIndex[burnWalletTx->hashBlock]->nHeight;
     pblock->burnCTx = burnWalletTx->nIndex;
     pblock->burnCTxOut = burnWalletTx->GetBurnOutTxIndex();
