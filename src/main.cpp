@@ -54,7 +54,6 @@ map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
-map<uint256, CBlock*> mapProofOfBurnDependencies;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -1881,27 +1880,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //GUI:
 // GUI thinks that PoB blocks are mined until they are comfirmed
 //
-//More important:
-// When downloading the blocks, PoB requires the previous block, in Process Block, there is a place for shunting
-//  blocks until the prevblock comes, look into that
-//
-// Usually the CBlock::BurnCheckEffectiveCoins complains and the HashBurnData, pindexLast not found
-//  for the HashBurnData pindex search, I say simply take that out and pass as an argument hashPrevBlock
-//
-// Make PoB hashing blocks completly independant, take out any mapBlockIndex searches within the HashBurnData()
-//  and assosiated functions
-// 
-// Take the block coments in GetBurnData and HashBurnData functions and apply them into Process block() 
-//  instead of the hashing
-//
-// Where it checks if the prevBlock was found, make that for !pblock->IsProofOfBurn() blocks
-// Add own one for PoB blocks that records the depending prevBlockHash and burnTxHash
-//  that records them in a map somehow
-//
-// Change the part after AcceptBlock() call accordingly if the above path is taken
-//
-// YESTERDAY: In Process Block() add the dependency check and clean up burn fns
-// Add code that accepts the orphan block if both dependencies are met
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2099,19 +2077,21 @@ bool CBlock::AcceptBlock()
   if(mapBlockIndex.count(hash))
     return error("AcceptBlock() : block already in mapBlockIndex");
 
+  // Get prev block index
+  map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
+  if(mi == mapBlockIndex.end())
+    return DoS(10, error("AcceptBlock() : prev block not found"));
+
   //Test PoB data before accepting
   if(IsProofOfBurn())
   {
-    if(!mapBlockIndex.count(hashPrevBlock))
-      return error("AcceptBlock() : hashPrevBlock not in mapBlockIndex");
-
     //the previous block cannot be a PoB block
     if(mapBlockIndex[hashPrevBlock]->IsProofOfBurn())
       return DoS(100, error("AcceptBlock() : previous block is proof-of-burn block"));
 
     CBlockIndex *pBurnIndex = pindexByHeight(burnBlkHeight);
     if(!pBurnIndex || hashBurnBlock != pBurnIndex->GetBlockHash())
-      return error("AcceptBlock() : hashBurnBlock does not equal the pBurnIndex's block hash");
+      return DoS(10, error("AcceptBlock() : hashBurnBlock does not equal the pBurnIndex's block hash"));
 
     // The effective burn coins have to match, regardless of what block type it is
     int64 calcEffCoins = 0;
@@ -2123,13 +2103,8 @@ bool CBlock::AcceptBlock()
       return DoS(50, error("AcceptBlock() : proof-of-burn failed"));
 
     if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
-      return error("AcceptBlock() : Public signatures do not match with burn transactions's");
+      return DoS(50, error("AcceptBlock() : Public signatures do not match with burn transactions's"));
   }
-
-  // Get prev block index
-  map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
-  if(mi == mapBlockIndex.end())
-    return DoS(10, error("AcceptBlock() : prev block not found"));
 
   CBlockIndex* pindexPrev = (*mi).second;
   int nHeight = pindexPrev->nHeight + 1;
@@ -2258,10 +2233,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
     Checkpoints::AskForPendingSyncCheckpoint(pfrom);
 
   // If don't already have its previous block and is not PoB, shunt it off to holding area until we get it
-  //  PoB blocks also depend on the burn transaction block to be in the block index list
-  u8int mapPrevBlockCount = mapBlockIndex.count(pblock->hashPrevBlock);
-  CBlockIndex *pBurnIndex = pindexByHeight(pblock->burnBlkHeight);
-  if(!mapPrevBlockCount || (pblock->IsProofOfBurn() && !pBurnIndex))
+  if(!mapBlockIndex.count(pblock->hashPrevBlock))
   {
     printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
     CBlock *pblock2 = new CBlock(*pblock);
@@ -2279,28 +2251,16 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
                      pblock2->GetProofOfStake().second, hash.ToString().c_str());
       }else
         setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
-    }else if(pblock2->IsProofOfBurn())
-    {
-      if(!pBurnIndex)
-        mapProofOfBurnDependencies.insert(make_pair(pblock2->hashBurnBlock, pblock2));
     }
 
-    //only add the previous block to the orphans if they are not in the mapBlockIndex
-    if(!mapPrevBlockCount)
-    {
-      mapOrphanBlocks.insert(make_pair(hash, pblock2));
-      mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
-    }
+    mapOrphanBlocks.insert(make_pair(hash, pblock2));
+    mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
 
     // Ask this guy to fill in what we're missing
     if(pfrom)
     {
-      //ask for the blocks if it really needs them
-      if(!mapPrevBlockCount)
-        pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(pblock2));
 
-      if(pblock2->IsProofOfBurn() && !pBurnIndex)
-        pfrom->PushGetBlocks(pindexBest, pblock2->hashBurnBlock);
+      pfrom->PushGetBlocks(pindexBest, GetOrphanRoot(pblock2));
 
       // slimcoin: getblocks may not obtain the ancestor block rejected
       // earlier by duplicate-stake check so we ask for it again directly
@@ -2320,23 +2280,6 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   for(unsigned int i = 0; i < vWorkQueue.size(); i++)
   {
     uint256 hashPrev = vWorkQueue[i];
-
-    //if this block is needed by a PoB block for the burnTx
-    if(mapProofOfBurnDependencies.count(hashPrev))
-    {
-      CBlock *pBurnOrphan = mapProofOfBurnDependencies[hashPrev];
-
-      //if the PoB orphan's prev block is not in the orphans map, accept it
-      if(!mapOrphanBlocksByPrev.count(pBurnOrphan->hashPrevBlock))
-      {
-        if(pBurnOrphan->AcceptBlock())
-          vWorkQueue.push_back(pBurnOrphan->GetHash());
-
-        delete pBurnOrphan;
-      }
-
-      mapProofOfBurnDependencies.erase(hashPrev);
-    }
 
     for(multimap<uint256, CBlock*>::iterator mi = mapOrphanBlocksByPrev.lower_bound(hashPrev);
          mi != mapOrphanBlocksByPrev.upper_bound(hashPrev); ++mi)
@@ -3190,10 +3133,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
       return error("message getdata size() = %d", vInv.size());
     }
 
-    BOOST_FOREACH(const CInv& inv, vInv)
+    BOOST_FOREACH(const CInv &inv, vInv)
     {
       if(fShutdown)
         return true;
+
       printf("received getdata for: %s", inv.ToString().c_str());
 
       if(inv.type == MSG_BLOCK)
