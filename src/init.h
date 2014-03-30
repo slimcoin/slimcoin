@@ -7,8 +7,6 @@
 
 #include "wallet.h"
 
-#define DEBUG_INIT true
-
 extern CWallet* pwalletMain;
 
 void StartShutdown();

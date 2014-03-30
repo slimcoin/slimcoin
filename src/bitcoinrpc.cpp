@@ -991,10 +991,8 @@ Value burncoins(const Array &params, bool fHelp)
 
   string strAccount = AccountFromValue(params[0]);
   
-  const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
-
-  if(!burnAddress.IsValid())
-    throw JSONRPCError(-5, "Invalid slimcoin burnAddress");
+  CBitcoinAddress burnAddress;
+  GetBurnAddress(burnAddress);
 
   int64 nAmount = AmountFromValue(params[1]);
 

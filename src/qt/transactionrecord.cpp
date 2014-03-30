@@ -109,7 +109,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
         for(int nOut = 0; nOut < wtx.vout.size(); nOut++)
         {
-          const CTxOut& txout = wtx.vout[nOut];
+          const CTxOut &txout = wtx.vout[nOut];
           TransactionRecord sub(hash, nTime);
           sub.idx = parts.size();
 
@@ -120,15 +120,17 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             continue;
           }
 
-          CBitcoinAddress address;
+          CBitcoinAddress address, burnAddress;
+          GetBurnAddress(burnAddress);
           if(ExtractAddress(txout.scriptPubKey, address))
           {
-            // Sent to Bitcoin Address
-            sub.type = TransactionRecord::SendToAddress;
+            if(address != burnAddress)
+              sub.type = TransactionRecord::SendToAddress; // Sent to Slimcoin Address
+            else
+              sub.type = TransactionRecord::Burned; // Burned coins
+
             sub.address = address.ToString();
-          }
-          else
-          {
+          }else{
             // Sent to IP, or other non-address transaction like OP_EVAL
             sub.type = TransactionRecord::SendToOther;
             sub.address = mapValue["to"];
@@ -145,9 +147,7 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
 
           parts.append(sub);
         }
-      }
-      else
-      {
+      }else{
         //
         // Mixed debit transaction, can't break down payees
         //

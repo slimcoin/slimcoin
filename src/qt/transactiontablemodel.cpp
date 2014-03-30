@@ -367,6 +367,8 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     return tr("Mint by stake");
   case TransactionRecord::BurnMint:
     return tr("Mint by burn");
+  case TransactionRecord::Burned:
+    return tr("Burned");
   default:
     return QString();
   }
@@ -384,6 +386,8 @@ QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx
   case TransactionRecord::SendToAddress:
   case TransactionRecord::SendToOther:
     return QIcon(":/icons/tx_output");
+  case TransactionRecord::Burned:
+    return QIcon(":/icons/tx_burn");
   default:
     return QIcon(":/icons/tx_inout");
   }
@@ -401,6 +405,8 @@ QString TransactionTableModel::formatTxToAddress(const TransactionRecord *wtx, b
     return lookupAddress(wtx->address, tooltip);
   case TransactionRecord::SendToOther:
     return QString::fromStdString(wtx->address);
+  case TransactionRecord::Burned:
+    return QString(fTestNet ? "Testnet Burn Address" : "Burn Address");
   case TransactionRecord::SendToSelf:
   case TransactionRecord::Generated:
   default:

@@ -112,12 +112,6 @@ int main(int argc, char **argv)
 {
   bool fRet = false;
 
-#if DEBUG_INIT
-  //manually turn on print to console
-  fPrintToConsole = true;
-  
-#endif
-
   fRet = AppInit(argc, argv);
 
   if(fRet && fDaemon)
@@ -149,7 +143,7 @@ bool AppInit(int argc, char* argv[])
   return fRet;
 }
 
-bool AppInit2(int argc, char* argv[])
+bool AppInit2(int argc, char *argv[])
 {
 #ifdef _MSC_VER
   // Turn off microsoft heap dump noise
@@ -303,9 +297,7 @@ bool AppInit2(int argc, char* argv[])
   fServer = true;
 #endif
 
-#if !DEBUG_INIT
   fPrintToConsole = GetBoolArg("-printtoconsole");
-#endif
   fPrintToDebugger = GetBoolArg("-printtodebugger");
   fLogTimestamps = GetBoolArg("-logtimestamps");
 

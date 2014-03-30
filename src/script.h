@@ -188,7 +188,7 @@ enum opcodetype
 };
 
 const char* GetOpName(opcodetype opcode);
-
+bool ExtractAddress(const CScript &scriptPubKey, CBitcoinAddress &addressRet);
 bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<std::vector<unsigned char> >& vSolutionsRet);
 
 
@@ -496,6 +496,7 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
     if(!Solver(*this, whichTypeThis, vSolutionsThis))
       return false;
 
+    //This CScript must be a TX_PUBKEY
     if(whichTypeThis != TX_PUBKEY)
       return false;
 
@@ -505,12 +506,19 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
     if(!Solver(scriptPubKey, whichTypeTesting, vSolutionsTesting))
       return false;
 
-    if(whichTypeTesting != TX_PUBKEY)
-      return false;
+    //The testing pubkey can be either a TX_PUBKEY or TX_PUBKEYHASH
+    if(whichTypeTesting == TX_PUBKEY || whichTypeTesting == TX_PUBKEYHASH)
+    {
+      CBitcoinAddress thisAddr, testingAddr;
+      if(!ExtractAddress(*this, thisAddr))
+        return false;
+      if(!ExtractAddress(scriptPubKey, testingAddr))
+        return false;
 
-    //vSolutions[0] contains the public key
-    // inorder to be compared, each pubKey has to be converted to a string
-    return ValueString(vSolutionsThis[0]) == ValueString(vSolutionsTesting[0]);
+      // the testing is a hash, so hash this and compare
+      return thisAddr == testingAddr;
+    }else
+      return false;
 
   }
 
@@ -591,13 +599,12 @@ CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<un
 
 
 
-bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& script, const CTransaction& txTo, unsigned int nIn, int nHashType);
-int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned char> >& vSolutions);
-bool IsStandard(const CScript& scriptPubKey);
-bool IsMine(const CKeyStore& keystore, const CScript& scriptPubKey);
-bool ExtractAddress(const CScript& scriptPubKey, CBitcoinAddress& addressRet);
-bool ExtractAddresses(const CScript& scriptPubKey, txnouttype& typeRet, std::vector<CBitcoinAddress>& addressRet, int& nRequiredRet);
-bool SignSignature(const CKeyStore& keystore, const CTransaction& txFrom, CTransaction& txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
-bool VerifySignature(const CTransaction& txFrom, const CTransaction& txTo, unsigned int nIn, bool fValidatePayToScriptHash, int nHashType);
+bool EvalScript(std::vector<std::vector<unsigned char> > &stack, const CScript &script, const CTransaction &txTo, unsigned int nIn, int nHashType);
+int ScriptSigArgsExpected(txnouttype t, const std::vector<std::vector<unsigned char> > &vSolutions);
+bool IsStandard(const CScript &scriptPubKey);
+bool IsMine(const CKeyStore &keystore, const CScript &scriptPubKey);
+bool ExtractAddresses(const CScript &scriptPubKey, txnouttype &typeRet, std::vector<CBitcoinAddress> &addressRet, int &nRequiredRet);
+bool SignSignature(const CKeyStore &keystore, const CTransaction &txFrom, CTransaction &txTo, unsigned int nIn, int nHashType=SIGHASH_ALL);
+bool VerifySignature(const CTransaction &txFrom, const CTransaction &txTo, unsigned int nIn, bool fValidatePayToScriptHash, int nHashType);
 
 #endif

@@ -77,6 +77,7 @@ TransactionView::TransactionView(QWidget *parent) :
     typeWidget->addItem(tr("Mined"), TransactionFilterProxy::TYPE(TransactionRecord::Generated));
     typeWidget->addItem(tr("Mint by stake"), TransactionFilterProxy::TYPE(TransactionRecord::StakeMint));
     typeWidget->addItem(tr("Mint by burn"), TransactionFilterProxy::TYPE(TransactionRecord::BurnMint));
+    typeWidget->addItem(tr("Burned"), TransactionFilterProxy::TYPE(TransactionRecord::Burned));
     typeWidget->addItem(tr("Other"), TransactionFilterProxy::TYPE(TransactionRecord::Other));
 
     hlayout->addWidget(typeWidget);

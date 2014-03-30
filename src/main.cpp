@@ -293,12 +293,20 @@ bool CTransaction::ReadFromDisk(COutPoint prevout)
 
 
 //Returns the pubKet of the first txIn of this tx
-bool CTransaction::GetSendersPubKey(CScript &scriptPubKeyRet) const
+// fOurPubKey is a bool stating, if the outTx pointed to by the outpoint of the first 
+//     inTx of this transaction has a CScript that is type TX_PUBKEYHASH, if fOurPubKey
+//     is true, then it will look the hash up in pwalletMain's keystore and return
+//     a CScript of type TX_PUBKEY in scriptPubKeyRet. 
+//
+//     If the sender of this transaction is not us and the outTx's CScript is type TX_PUBKEYHASH, 
+//     it is impossible for us to return a CScript of type TX_PUBKEY
+bool CTransaction::GetSendersPubKey(CScript &scriptPubKeyRet, bool fOurPubKey) const
 {
   if(vin.empty())
     return false;
     
   const CTxIn input = vin[0];
+
   CTransaction prevTx;
 
   // First try finding the previous transaction in database
@@ -311,7 +319,27 @@ bool CTransaction::GetSendersPubKey(CScript &scriptPubKeyRet) const
 
   txdb.Close();
 
+  //get the script key
   scriptPubKeyRet = prevTx.vout[input.prevout.n].scriptPubKey;
+
+  //Check what type the scriptPubKeyRet is
+  vector<valtype> vSolutions;
+  txnouttype whichType;
+  if(!Solver(scriptPubKeyRet, whichType, vSolutions))
+    return error("GetSendersPubKey() : Solver failed");
+
+  //if the scriptPubKeyRet is a pubkey hash, get the raw public key form
+  if(whichType == TX_PUBKEYHASH && fOurPubKey == true) // pay to address type
+  {
+    // convert to pay to public key type
+    CKey key;
+    if(!pwalletMain->GetKey(uint160(vSolutions[0]), key))
+      return error("GetSendersPubKey() : failed to get key for burn tx type=%d", whichType);
+
+    //clear the old data and give it the new data
+    scriptPubKeyRet.clear();
+    scriptPubKeyRet << key.GetPubKey() << OP_CHECKSIG;
+  }
 
   //sucess!
   return true;
@@ -2307,11 +2335,11 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 }
 
 // slimcoin: sign block
-bool CBlock::SignBlock(const CKeyStore& keystore)
+bool CBlock::SignBlock(const CKeyStore &keystore)
 {
   vector<valtype> vSolutions;
   txnouttype whichType;
-  const CTxOut& txout = IsProofOfStake() ? vtx[1].vout[1] : vtx[0].vout[0];
+  const CTxOut &txout = IsProofOfStake() ? vtx[1].vout[1] : vtx[0].vout[0];
 
   if(!Solver(txout.scriptPubKey, whichType, vSolutions))
     return false;
@@ -4020,10 +4048,8 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
 
   //check if burnTxOut's address is a burn address
   // with a bunch of sanity checks
-  const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
-
-  if(!burnAddress.IsValid())
-    return error("GetBurnHash(): Burn address is invalid");
+  CBitcoinAddress burnAddress;
+  GetBurnAddress(burnAddress);
 
   //check if the out transaction went to a burn address
   CBitcoinAddress address;
@@ -4214,7 +4240,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
       return NULL;
 
     CScript sendersPubKey;
-    if(!burnTx.GetSendersPubKey(sendersPubKey))
+    if(!burnTx.GetSendersPubKey(sendersPubKey, true))
       return NULL;
 
     vector<valtype> vSolutions;
@@ -4816,7 +4842,7 @@ void SlimCoinAfterBurner(CWallet *pwallet)
       //
       auto_ptr<CBlock> pblock(CreateNewBlock(pwallet, false, &smallestWTx));
       if(!pblock.get())
-        return;
+        continue;
 
       IncrementExtraNonce(pblock.get(), pindexLastBlock, nExtraNonce);
 

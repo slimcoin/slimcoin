@@ -42,6 +42,7 @@
         <file alias="key">res/icons/key.png</file>
         <file alias="filesave">res/icons/filesave.png</file>
         <file alias="wallet_bgcoin">res/images/wallet_bgcoin.png</file>
+        <file alias="tx_burn">res/icons/tx_burn.png</file>
     </qresource>
     <qresource prefix="/images">
         <file alias="about">res/images/about.png</file>

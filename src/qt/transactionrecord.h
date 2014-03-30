@@ -70,7 +70,8 @@ public:
         RecvFromOther,
         SendToSelf,
         StakeMint,
-        BurnMint
+        BurnMint,
+        Burned
     };
 
     /** Number of confirmation needed for transaction */

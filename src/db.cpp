@@ -10,6 +10,7 @@
 #include "util.h"
 #include "main.h"
 #include "kernel.h"
+#include "ui_interface.h"
 #include <boost/version.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -698,6 +699,7 @@ bool CTxDB::LoadBlockIndex()
   if(nCheckDepth > nBestHeight)
     nCheckDepth = nBestHeight;
 
+  InitMessage("Verifying blocks...");
   printf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
   CBlockIndex* pindexFork = NULL;
   map<pair<unsigned int, unsigned int>, CBlockIndex*> mapBlockPos;

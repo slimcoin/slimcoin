@@ -147,6 +147,12 @@ inline int64 BurnCalcEffectiveCoins(int64 nCoins, s32int depthInChain)
   return nCoins / pow(BURN_DECAY_RATE, depthInChain);
 }
 
+inline void GetBurnAddress(CBitcoinAddress &addressRet)
+{
+  addressRet = fTestNet ? burnTestnetAddress : burnOfficialAddress;
+  return;
+}
+
 //////////////////////////////////////////////////////////////////////////////
 /*                              Proof Of Burn                               */
 //////////////////////////////////////////////////////////////////////////////
@@ -639,19 +645,14 @@ public:
   }
 
   //Returns the pubKet of the first txIn of this tx
-  bool GetSendersPubKey(CScript &scriptPubKeyRet) const;
+  bool GetSendersPubKey(CScript &scriptPubKeyRet, bool fOurPubKey=false) const;
 
   //return the index of a burn transaction in vout, -1 if not found
   s32int GetBurnOutTxIndex() const
   {
     //find the burnt transaction
-    const CBitcoinAddress &burnAddress = fTestNet ? burnTestnetAddress : burnOfficialAddress;
-
-    if(!burnAddress.IsValid())
-    {
-      printf("CTransaction GetBurnOutTxIndex: Burn address is invalid\n");
-      return -1;
-    }
+    CBitcoinAddress burnAddress;
+    GetBurnAddress(burnAddress);
 
     u32int i;
     for(i = 0; i < vout.size(); i++)
@@ -1117,6 +1118,7 @@ public:
     if(!indexTx.GetSendersPubKey(indexTxScript))
       return false;
 
+    //compare the block's coinbase's script with the burn transaction's sender's script
     return vtx[0].vout[0].scriptPubKey.comparePubKeySignature(indexTxScript);
   }
 

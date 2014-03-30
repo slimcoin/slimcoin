@@ -231,6 +231,7 @@ int main(int argc, char *argv[])
   {
     BitcoinGUI window;
     guiref = &window;
+
     if(AppInit2(argc, argv))
     {
       {
@@ -252,13 +253,9 @@ int main(int argc, char *argv[])
 
         // If -min option passed, start window minimized.
         if(GetBoolArg("-min"))
-        {
           window.showMinimized();
-        }
         else
-        {
           window.show();
-        }
 
         // Place this here as guiref has to be defined if we dont want to lose URIs
         ipcInit();

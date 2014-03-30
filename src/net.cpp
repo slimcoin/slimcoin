@@ -1703,16 +1703,17 @@ bool StopNode()
     Sleep(20);
   } while(true);
 
-  if(vnThreadsRunning[THREAD_SOCKETHANDLER] > 0) printf("ThreadSocketHandler still running\n");
-  if(vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0) printf("ThreadOpenConnections still running\n");
-  if(vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0) printf("ThreadMessageHandler still running\n");
-  if(vnThreadsRunning[THREAD_MINER] > 0) printf("ThreadSlimcoinMiner still running\n");
-  if(vnThreadsRunning[THREAD_RPCSERVER] > 0) printf("ThreadRPCServer still running\n");
+  if(vnThreadsRunning[THREAD_SOCKETHANDLER] > 0)     printf("ThreadSocketHandler still running\n");
+  if(vnThreadsRunning[THREAD_OPENCONNECTIONS] > 0)   printf("ThreadOpenConnections still running\n");
+  if(vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0)    printf("ThreadMessageHandler still running\n");
+  if(vnThreadsRunning[THREAD_MINER] > 0)             printf("ThreadSlimcoinMiner still running\n");
+  if(vnThreadsRunning[THREAD_BURNER] > 0)            printf("ThreadAfterBurner still running\n");
+  if(vnThreadsRunning[THREAD_RPCSERVER] > 0)         printf("ThreadRPCServer still running\n");
   if(fHaveUPnP && vnThreadsRunning[THREAD_UPNP] > 0) printf("ThreadMapPort still running\n");
-  if(vnThreadsRunning[THREAD_DNSSEED] > 0) printf("ThreadDNSAddressSeed still running\n");
-  if(vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0) printf("ThreadOpenAddedConnections still running\n");
-  if(vnThreadsRunning[THREAD_DUMPADDRESS] > 0) printf("ThreadDumpAddresses still running\n");
-  if(vnThreadsRunning[THREAD_MINTER] > 0) printf("ThreadStakeMinter still running\n");
+  if(vnThreadsRunning[THREAD_DNSSEED] > 0)           printf("ThreadDNSAddressSeed still running\n");
+  if(vnThreadsRunning[THREAD_ADDEDCONNECTIONS] > 0)  printf("ThreadOpenAddedConnections still running\n");
+  if(vnThreadsRunning[THREAD_DUMPADDRESS] > 0)       printf("ThreadDumpAddresses still running\n");
+  if(vnThreadsRunning[THREAD_MINTER] > 0)            printf("ThreadStakeMinter still running\n");
 
   while(vnThreadsRunning[THREAD_MESSAGEHANDLER] > 0 || vnThreadsRunning[THREAD_RPCSERVER] > 0)
     Sleep(20);

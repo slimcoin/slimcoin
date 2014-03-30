@@ -1199,7 +1199,7 @@ bool CheckSig(vector<unsigned char> vchSig, vector<unsigned char> vchPubKey, CSc
 //
 // Return public keys or hashes from scriptPubKey, for 'standard' transaction types.
 //
-bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsigned char> >& vSolutionsRet)
+bool Solver(const CScript &scriptPubKey, txnouttype &typeRet, vector<vector<unsigned char> > &vSolutionsRet)
 {
   // Templates
   static map<txnouttype, CScript> mTemplates;
@@ -1208,7 +1208,7 @@ bool Solver(const CScript& scriptPubKey, txnouttype& typeRet, vector<vector<unsi
     // Standard tx, sender provides pubkey, receiver adds signature
     mTemplates.insert(make_pair(TX_PUBKEY, CScript() << OP_PUBKEY << OP_CHECKSIG));
 
-    // Bitcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
+    // Slimcoin address tx, sender provides hash of pubkey, receiver provides signature and pubkey
     mTemplates.insert(make_pair(TX_PUBKEYHASH, CScript() << OP_DUP << OP_HASH160 << OP_PUBKEYHASH << OP_EQUALVERIFY << OP_CHECKSIG));
 
     // Sender provides N pubkeys, receivers provides M signatures
@@ -1482,7 +1482,7 @@ bool IsMine(const CKeyStore &keystore, const CScript& scriptPubKey)
   return false;
 }
 
-bool ExtractAddress(const CScript& scriptPubKey, CBitcoinAddress& addressRet)
+bool ExtractAddress(const CScript &scriptPubKey, CBitcoinAddress &addressRet)
 {
   vector<valtype> vSolutions;
   txnouttype whichType;
@@ -1508,7 +1508,7 @@ bool ExtractAddress(const CScript& scriptPubKey, CBitcoinAddress& addressRet)
   return false;
 }
 
-bool ExtractAddresses(const CScript& scriptPubKey, txnouttype& typeRet, vector<CBitcoinAddress>& addressRet, int& nRequiredRet)
+bool ExtractAddresses(const CScript &scriptPubKey, txnouttype &typeRet, vector<CBitcoinAddress> &addressRet, int &nRequiredRet)
 {
   addressRet.clear();
   typeRet = TX_NONSTANDARD;
@@ -1542,7 +1542,7 @@ bool ExtractAddresses(const CScript& scriptPubKey, txnouttype& typeRet, vector<C
   return true;
 }
 
-bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, 
+bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey, const CTransaction &txTo, 
                   unsigned int nIn, bool fValidatePayToScriptHash, int nHashType)
 {
   vector<vector<unsigned char> > stack, stackCopy;
@@ -1665,7 +1665,7 @@ unsigned int CScript::GetSigOpCount(bool fAccurate) const
   return n;
 }
 
-unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
+unsigned int CScript::GetSigOpCount(const CScript &scriptSig) const
 {
   if(!IsPayToScriptHash())
     return GetSigOpCount(true);
@@ -1698,7 +1698,7 @@ bool CScript::IsPayToScriptHash() const
           this->at(22) == OP_EQUAL);
 }
 
-void CScript::SetBitcoinAddress(const CBitcoinAddress& address)
+void CScript::SetBitcoinAddress(const CBitcoinAddress &address)
 {
   this->clear();
   if(address.IsScript())
@@ -1707,7 +1707,7 @@ void CScript::SetBitcoinAddress(const CBitcoinAddress& address)
     *this << OP_DUP << OP_HASH160 << address.GetHash160() << OP_EQUALVERIFY << OP_CHECKSIG;
 }
 
-void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
+void CScript::SetMultisig(int nRequired, const std::vector<CKey> &keys)
 {
   this->clear();
 
@@ -1717,7 +1717,7 @@ void CScript::SetMultisig(int nRequired, const std::vector<CKey>& keys)
   *this << EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
 }
 
-void CScript::SetPayToScriptHash(const CScript& subscript)
+void CScript::SetPayToScriptHash(const CScript &subscript)
 {
   assert(!subscript.empty());
   uint160 subscriptHash = Hash160(subscript);
