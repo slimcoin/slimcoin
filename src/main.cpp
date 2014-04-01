@@ -1905,8 +1905,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 //
-//GUI:
-// GUI thinks that PoB blocks are mined until they are comfirmed
+//TODO: make setNumBlocks in RPC
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -2745,6 +2744,9 @@ string GetWarnings(string strFor)
   string strRPC;
   if(GetBoolArg("-testsafemode"))
     strRPC = "test";
+
+  if(!CLIENT_VERSION_IS_RELEASE)
+    strStatusBar = _("This is a pre-release test build - use at your own risk - do not use for mining or merchant applications");
 
   // slimcoin: wallet lock warning for minting
   if(strMintWarning != "")

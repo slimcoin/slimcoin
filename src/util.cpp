@@ -198,6 +198,7 @@ static FILE* fileout = NULL;
 
 inline int OutputDebugStringF(const char* pszFormat, ...)
 {
+
   int ret = 0;
   if(fPrintToConsole)
   {

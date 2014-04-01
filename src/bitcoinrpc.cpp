@@ -91,10 +91,10 @@ int64 AmountFromValue(const Value& value)
 {
   double dAmount = value.get_real();
   if(dAmount <= 0.0 || dAmount > MAX_MONEY)
-    throw JSONRPCError(-3, "Invalid amount");
+    throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
   int64 nAmount = roundint64(dAmount * COIN);
   if(!MoneyRange(nAmount))
-    throw JSONRPCError(-3, "Invalid amount");
+    throw JSONRPCError(RPC_TYPE_ERROR, "Invalid amount");
   return nAmount;
 }
 
@@ -133,7 +133,7 @@ string AccountFromValue(const Value& value)
 {
   string strAccount = value.get_str();
   if(strAccount == "*")
-    throw JSONRPCError(-11, "Invalid account name");
+    throw JSONRPCError(RPC_WALLET_INVALID_ACCOUNT_NAME, "Invalid account name");
   return strAccount;
 }
 
@@ -457,7 +457,7 @@ Value getnewaddress(const Array& params, bool fHelp)
   // Generate a new key that is added to wallet
   std::vector<unsigned char> newKey;
   if(!pwalletMain->GetKeyFromPool(newKey, false))
-    throw JSONRPCError(-12, "Error: Keypool ran out, please call keypoolrefill first");
+    throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
   CBitcoinAddress address(newKey);
 
   pwalletMain->SetAddressBookName(address, strAccount);
@@ -495,7 +495,7 @@ CBitcoinAddress GetAccountAddress(string strAccount, bool bForceNew=false)
   if(account.vchPubKey.empty() || bForceNew || bKeyUsed)
   {
     if(!pwalletMain->GetKeyFromPool(account.vchPubKey, false))
-      throw JSONRPCError(-12, "Error: Keypool ran out, please call keypoolrefill first");
+      throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
 
     pwalletMain->SetAddressBookName(CBitcoinAddress(account.vchPubKey), strAccount);
     walletdb.WriteAccount(strAccount, account);
@@ -532,7 +532,7 @@ Value setaccount(const Array& params, bool fHelp)
 
   CBitcoinAddress address(params[0].get_str());
   if(!address.IsValid())
-    throw JSONRPCError(-5, "Invalid slimcoin address");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
 
 
   string strAccount;
@@ -562,7 +562,7 @@ Value getaccount(const Array& params, bool fHelp)
 
   CBitcoinAddress address(params[0].get_str());
   if(!address.IsValid())
-    throw JSONRPCError(-5, "Invalid slimcoin address");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
 
   string strAccount;
   map<CBitcoinAddress, string>::iterator mi = pwalletMain->mapAddressBook.find(address);
@@ -620,12 +620,12 @@ Value sendtoaddress(const Array& params, bool fHelp)
 
   CBitcoinAddress address(params[0].get_str());
   if(!address.IsValid())
-    throw JSONRPCError(-5, "Invalid slimcoin address");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
 
   // Amount
   int64 nAmount = AmountFromValue(params[1]);
   if(nAmount < MIN_TXOUT_AMOUNT)
-    throw JSONRPCError(-101, "Send amount too small");
+    throw JSONRPCError(RPC_SEND_AMOUNT_TOO_SMALL, "Send amount too small");
 
   // Wallet comments
   CWalletTx wtx;
@@ -635,11 +635,12 @@ Value sendtoaddress(const Array& params, bool fHelp)
     wtx.mapValue["to"]      = params[3].get_str();
 
   if(pwalletMain->IsLocked())
-    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
   string strError = pwalletMain->SendMoneyToBitcoinAddress(address, nAmount, wtx);
   if(strError != "")
-    throw JSONRPCError(-4, strError);
+    throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
   return wtx.GetHash().GetHex();
 }
@@ -652,18 +653,19 @@ Value signmessage(const Array& params, bool fHelp)
       "Sign a message with the private key of an address");
 
   if(pwalletMain->IsLocked())
-    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, 
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
   string strAddress = params[0].get_str();
   string strMessage = params[1].get_str();
 
   CBitcoinAddress addr(strAddress);
   if(!addr.IsValid())
-    throw JSONRPCError(-3, "Invalid address");
+    throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
 
   CKey key;
   if(!pwalletMain->GetKey(addr, key))
-    throw JSONRPCError(-4, "Private key not available");
+    throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
 
   CDataStream ss(SER_GETHASH, 0);
   ss << strMessageMagic;
@@ -671,7 +673,7 @@ Value signmessage(const Array& params, bool fHelp)
 
   vector<unsigned char> vchSig;
   if(!key.SignCompact(Hash(ss.begin(), ss.end()), vchSig))
-    throw JSONRPCError(-5, "Sign failed");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Sign failed");
 
   return EncodeBase64(&vchSig[0], vchSig.size());
 }
@@ -689,13 +691,13 @@ Value verifymessage(const Array& params, bool fHelp)
 
   CBitcoinAddress addr(strAddress);
   if(!addr.IsValid())
-    throw JSONRPCError(-3, "Invalid address");
+    throw JSONRPCError(RPC_TYPE_ERROR, "Invalid address");
 
   bool fInvalid = false;
   vector<unsigned char> vchSig = DecodeBase64(strSign.c_str(), &fInvalid);
 
   if(fInvalid)
-    throw JSONRPCError(-5, "Malformed base64 encoding");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Malformed base64 encoding");
 
   CDataStream ss(SER_GETHASH, 0);
   ss << strMessageMagic;
@@ -720,7 +722,7 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
   CBitcoinAddress address = CBitcoinAddress(params[0].get_str());
   CScript scriptPubKey;
   if(!address.IsValid())
-    throw JSONRPCError(-5, "Invalid slimcoin address");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
   scriptPubKey.SetBitcoinAddress(address);
   if(!IsMine(*pwalletMain,scriptPubKey))
     return (double)0.0;
@@ -905,7 +907,7 @@ Value movecmd(const Array& params, bool fHelp)
 
   CWalletDB walletdb(pwalletMain->strWalletFile);
   if(!walletdb.TxnBegin())
-    throw JSONRPCError(-20, "database error");
+    throw JSONRPCError(RPC_DATABASE_ERROR, "database error");
 
   int64 nNow = GetAdjustedTime();
 
@@ -928,7 +930,7 @@ Value movecmd(const Array& params, bool fHelp)
   walletdb.WriteAccountingEntry(credit);
 
   if(!walletdb.TxnCommit())
-    throw JSONRPCError(-20, "database error");
+    throw JSONRPCError(RPC_DATABASE_ERROR, "database error");
 
   return true;
 }
@@ -997,7 +999,7 @@ Value burncoins(const Array &params, bool fHelp)
   int64 nAmount = AmountFromValue(params[1]);
 
   if(nAmount < MIN_TXOUT_AMOUNT)
-    throw JSONRPCError(-101, "Send amount too small");
+    throw JSONRPCError(RPC_SEND_AMOUNT_TOO_SMALL, "Send amount too small");
 
   int nMinDepth = 1;
   if(params.size() > 2)
@@ -1012,17 +1014,18 @@ Value burncoins(const Array &params, bool fHelp)
     wtx.mapValue["to"]      = params[4].get_str();
 
   if(pwalletMain->IsLocked())
-    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
   // Check funds
   int64 nBalance = GetAccountBalance(strAccount, nMinDepth);
   if(nAmount > nBalance)
-    throw JSONRPCError(-6, "Account has insufficient funds");
+    throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
   // Send
   string strError = pwalletMain->SendMoneyToBitcoinAddress(burnAddress, nAmount, wtx, false, true);
   if(strError != "")
-    throw JSONRPCError(-4, strError);
+    throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
   return wtx.GetHash().GetHex();
 }
@@ -1102,11 +1105,11 @@ Value sendfrom(const Array &params, bool fHelp)
   CBitcoinAddress address(params[1].get_str());
 
   if(!address.IsValid())
-    throw JSONRPCError(-5, "Invalid slimcoin address");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
 
   int64 nAmount = AmountFromValue(params[2]);
   if(nAmount < MIN_TXOUT_AMOUNT)
-    throw JSONRPCError(-101, "Send amount too small");
+    throw JSONRPCError(RPC_SEND_AMOUNT_TOO_SMALL, "Send amount too small");
 
   int nMinDepth = 1;
   if(params.size() > 3)
@@ -1121,17 +1124,18 @@ Value sendfrom(const Array &params, bool fHelp)
     wtx.mapValue["to"]      = params[5].get_str();
 
   if(pwalletMain->IsLocked())
-    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
   // Check funds
   int64 nBalance = GetAccountBalance(strAccount, nMinDepth);
   if(nAmount > nBalance)
-    throw JSONRPCError(-6, "Account has insufficient funds");
+    throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
   // Send
   string strError = pwalletMain->SendMoneyToBitcoinAddress(address, nAmount, wtx);
   if(strError != "")
-    throw JSONRPCError(-4, strError);
+    throw JSONRPCError(RPC_WALLET_ERROR, strError);
 
   return wtx.GetHash().GetHex();
 }
@@ -1168,31 +1172,33 @@ Value sendmany(const Array& params, bool fHelp)
   {
     CBitcoinAddress address(s.name_);
     if(!address.IsValid())
-      throw JSONRPCError(-5, string("Invalid slimcoin address:")+s.name_);
+      throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid slimcoin address:")+s.name_);
 
     if(setAddress.count(address))
-      throw JSONRPCError(-8, string("Invalid parameter, duplicated address: ")+s.name_);
+      throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);
     setAddress.insert(address);
 
     CScript scriptPubKey;
     scriptPubKey.SetBitcoinAddress(address);
     int64 nAmount = AmountFromValue(s.value_); 
     if(nAmount < MIN_TXOUT_AMOUNT)
-      throw JSONRPCError(-101, "Send amount too small");
+      throw JSONRPCError(RPC_SEND_AMOUNT_TOO_SMALL, "Send amount too small");
     totalAmount += nAmount;
 
     vecSend.push_back(make_pair(scriptPubKey, nAmount));
   }
 
   if(pwalletMain->IsLocked())
-    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
   if(fWalletUnlockMintOnly)
-    throw JSONRPCError(-13, "Error: Wallet unlocked for block minting only.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Wallet unlocked for block minting only.");
 
   // Check funds
   int64 nBalance = GetAccountBalance(strAccount, nMinDepth);
   if(totalAmount > nBalance)
-    throw JSONRPCError(-6, "Account has insufficient funds");
+    throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Account has insufficient funds");
 
   // Send
   CReserveKey keyChange(pwalletMain);
@@ -1201,11 +1207,11 @@ Value sendmany(const Array& params, bool fHelp)
   if(!fCreated)
   {
     if(totalAmount + nFeeRequired > pwalletMain->GetBalance())
-      throw JSONRPCError(-6, "Insufficient funds");
-    throw JSONRPCError(-4, "Transaction creation failed");
+      throw JSONRPCError(RPC_WALLET_INSUFFICIENT_FUNDS, "Insufficient funds");
+    throw JSONRPCError(RPC_WALLET_ERROR, "Transaction creation failed");
   }
   if(!pwalletMain->CommitTransaction(wtx, keyChange))
-    throw JSONRPCError(-4, "Transaction commit failed");
+    throw JSONRPCError(RPC_WALLET_ERROR, "Transaction commit failed");
 
   return wtx.GetHash().GetHex();
 }
@@ -1530,9 +1536,9 @@ Value listtransactions(const Array& params, bool fHelp)
     nFrom = params[3].get_int();
 
   if(nCount < 0)
-    throw JSONRPCError(-8, "Negative count");
+    throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative count");
   if(nFrom < 0)
-    throw JSONRPCError(-8, "Negative from");
+    throw JSONRPCError(RPC_INVALID_PARAMETER, "Negative from");
 
   Array ret;
   CWalletDB walletdb(pwalletMain->strWalletFile);
@@ -1673,7 +1679,7 @@ Value listsinceblock(const Array& params, bool fHelp)
     target_confirms = params[1].get_int();
 
     if(target_confirms < 1)
-      throw JSONRPCError(-8, "Invalid parameter");
+      throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
   }
 
   int depth = pindex ? (1 + nBestHeight - pindex->nHeight) : -1;
@@ -1726,7 +1732,7 @@ Value gettransaction(const Array& params, bool fHelp)
   Object entry;
 
   if(!pwalletMain->mapWallet.count(hash))
-    throw JSONRPCError(-5, "Invalid or non-wallet transaction id");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid or non-wallet transaction id");
   const CWalletTx& wtx = pwalletMain->mapWallet[hash];
 
   int64 nCredit = wtx.GetCredit();
@@ -1774,12 +1780,13 @@ Value keypoolrefill(const Array& params, bool fHelp)
       "Fills the keypool.");
 
   if(pwalletMain->IsLocked())
-    throw JSONRPCError(-13, "Error: Please enter the wallet passphrase with walletpassphrase first.");
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
 
   pwalletMain->TopUpKeyPool();
 
   if(pwalletMain->GetKeyPoolSize() < GetArg("-keypool", 100))
-    throw JSONRPCError(-4, "Error refreshing keypool.");
+    throw JSONRPCError(RPC_WALLET_ERROR, "Error refreshing keypool.");
 
   return Value::null;
 }
@@ -1841,10 +1848,12 @@ Value walletpassphrase(const Array& params, bool fHelp)
   if(fHelp)
     return true;
   if(!pwalletMain->IsCrypted())
-    throw JSONRPCError(-15, "Error: running with an unencrypted wallet, but walletpassphrase was called.");
+    throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
+                       "Error: running with an unencrypted wallet, but walletpassphrase was called.");
 
   if(!pwalletMain->IsLocked())
-    throw JSONRPCError(-17, "Error: Wallet is already unlocked, use walletlock first if need to change unlock settings.");
+    throw JSONRPCError(RPC_WALLET_ALREADY_UNLOCKED,
+                       "Error: Wallet is already unlocked, use walletlock first if need to change unlock settings.");
 
   // Note that the walletpassphrase is stored in params[0] which is not mlock()ed
   SecureString strWalletPass;
@@ -1856,7 +1865,7 @@ Value walletpassphrase(const Array& params, bool fHelp)
   if(strWalletPass.length() > 0)
   {
     if(!pwalletMain->Unlock(strWalletPass))
-      throw JSONRPCError(-14, "Error: The wallet passphrase entered was incorrect.");
+      throw JSONRPCError(RPC_WALLET_PASSPHRASE_INCORRECT, "Error: The wallet passphrase entered was incorrect.");
   }
   else
     throw runtime_error(
@@ -1886,7 +1895,8 @@ Value walletpassphrasechange(const Array& params, bool fHelp)
   if(fHelp)
     return true;
   if(!pwalletMain->IsCrypted())
-    throw JSONRPCError(-15, "Error: running with an unencrypted wallet, but walletpassphrasechange was called.");
+    throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
+                       "Error: running with an unencrypted wallet, but walletpassphrasechange was called.");
 
   // TODO: get rid of these .c_str() calls by implementing SecureString::operator=(std::string)
   // Alternately, find a way to make params[0] mlock()'d to begin with.
@@ -1904,7 +1914,7 @@ Value walletpassphrasechange(const Array& params, bool fHelp)
       "Changes the wallet passphrase from <oldpassphrase> to <newpassphrase>.");
 
   if(!pwalletMain->ChangeWalletPassphrase(strOldWalletPass, strNewWalletPass))
-    throw JSONRPCError(-14, "Error: The wallet passphrase entered was incorrect.");
+    throw JSONRPCError(RPC_WALLET_PASSPHRASE_INCORRECT, "Error: The wallet passphrase entered was incorrect.");
 
   return Value::null;
 }
@@ -1921,7 +1931,8 @@ Value walletlock(const Array& params, bool fHelp)
   if(fHelp)
     return true;
   if(!pwalletMain->IsCrypted())
-    throw JSONRPCError(-15, "Error: running with an unencrypted wallet, but walletlock was called.");
+    throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
+                       "Error: running with an unencrypted wallet, but walletlock was called.");
 
   {
     LOCK(cs_nWalletUnlockTime);
@@ -1942,7 +1953,8 @@ Value encryptwallet(const Array& params, bool fHelp)
   if(fHelp)
     return true;
   if(pwalletMain->IsCrypted())
-    throw JSONRPCError(-15, "Error: running with an encrypted wallet, but encryptwallet was called.");
+    throw JSONRPCError(RPC_WALLET_WRONG_ENC_STATE,
+                       "Error: running with an encrypted wallet, but encryptwallet was called.");
 
   // TODO: get rid of this .c_str() by implementing SecureString::operator=(std::string)
   // Alternately, find a way to make params[0] mlock()'d to begin with.
@@ -1956,7 +1968,7 @@ Value encryptwallet(const Array& params, bool fHelp)
       "Encrypts the wallet with <passphrase>.");
 
   if(!pwalletMain->EncryptWallet(strWalletPass))
-    throw JSONRPCError(-16, "Error: Failed to encrypt the wallet.");
+    throw JSONRPCError(RPC_WALLET_ENCRYPTION_FAILED, "Error: Failed to encrypt the wallet.");
 
   // BDB seems to have a bad habit of writing old data into
   // slack space in .dat files; that is bad if the old data is
@@ -2033,10 +2045,10 @@ Value getwork(const Array& params, bool fHelp)
       "If [data] is specified, tries to solve the block and returns true if it was successful.");
 
   if(vNodes.empty())
-    throw JSONRPCError(-9, "SLIMCoin is not connected!");
+    throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "SLIMCoin is not connected!");
 
   if(IsInitialBlockDownload())
-    throw JSONRPCError(-10, "SLIMCoin is downloading blocks...");
+    throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "SLIMCoin is downloading blocks...");
 
   typedef map<uint256, pair<CBlock*, CScript> > mapNewBlock_t;
   static mapNewBlock_t mapNewBlock;
@@ -2068,7 +2080,7 @@ Value getwork(const Array& params, bool fHelp)
       // Create new block
       pblock = CreateNewBlock(pwalletMain);
       if(!pblock)
-        throw JSONRPCError(-7, "Out of memory");
+        throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
       vNewBlock.push_back(pblock);
     }
 
@@ -2103,7 +2115,7 @@ Value getwork(const Array& params, bool fHelp)
     // Parse parameters
     vector<unsigned char> vchData = ParseHex(params[0].get_str());
     if(vchData.size() != 128)
-      throw JSONRPCError(-8, "Invalid parameter");
+      throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
     CBlock* pdata = (CBlock*)&vchData[0];
 
     // Byte reverse
@@ -2120,7 +2132,7 @@ Value getwork(const Array& params, bool fHelp)
     pblock->vtx[0].vin[0].scriptSig = mapNewBlock[pdata->hashMerkleRoot].second;
     pblock->hashMerkleRoot = pblock->BuildMerkleTree();
     if(!pblock->SignBlock(*pwalletMain))
-      throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
+      throw JSONRPCError(RPC_UNABLE_TO_SIGN_BLOCK, "Unable to sign block, wallet locked?");
 
     return CheckWork(pblock, *pwalletMain, reservekey);
   }
@@ -2147,10 +2159,10 @@ Value getmemorypool(const Array& params, bool fHelp)
   if(params.size() == 0)
   {
     if(vNodes.empty())
-      throw JSONRPCError(-9, "SLIMCoin is not connected!");
+      throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "SLIMCoin is not connected!");
 
     if(IsInitialBlockDownload())
-      throw JSONRPCError(-10, "SLIMCoin is downloading blocks...");
+      throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "SLIMCoin is downloading blocks...");
 
     static CReserveKey reservekey(pwalletMain);
 
@@ -2171,7 +2183,7 @@ Value getmemorypool(const Array& params, bool fHelp)
         delete pblock;
       pblock = CreateNewBlock(pwalletMain);
       if(!pblock)
-        throw JSONRPCError(-7, "Out of memory");
+        throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
     }
 
     // Update nTime
@@ -2212,7 +2224,7 @@ Value getmemorypool(const Array& params, bool fHelp)
     static CReserveKey reservekey(pwalletMain);
 
     if(!pblock.SignBlock(*pwalletMain))
-      throw JSONRPCError(-100, "Unable to sign block, wallet locked?");
+      throw JSONRPCError(RPC_UNABLE_TO_SIGN_BLOCK, "Unable to sign block, wallet locked?");
 
     return CheckWork(&pblock, *pwalletMain, reservekey);
   }
@@ -2248,7 +2260,7 @@ Value getblock(const Array& params, bool fHelp)
   uint256 hash(strHash);
 
   if(!mapBlockIndex.count(hash))
-    throw JSONRPCError(-5, "Block not found");
+    throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
 
   CBlock block;
   CBlockIndex* pblockindex = mapBlockIndex[hash];
@@ -2954,7 +2966,7 @@ void ThreadRPCServer2(void* parg)
       // Parse request
       Value valRequest;
       if(!read_string(strRequest, valRequest) || valRequest.type() != obj_type)
-        throw JSONRPCError(-32700, "Parse error");
+        throw JSONRPCError(RPC_PARSE_ERROR, "Parse error");
       const Object& request = valRequest.get_obj();
 
       // Parse id now so errors from here on will have the id
@@ -2963,9 +2975,9 @@ void ThreadRPCServer2(void* parg)
       // Parse method
       Value valMethod = find_value(request, "method");
       if(valMethod.type() == null_type)
-        throw JSONRPCError(-32600, "Missing method");
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Missing method");
       if(valMethod.type() != str_type)
-        throw JSONRPCError(-32600, "Method must be a string");
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Method must be a string");
       string strMethod = valMethod.get_str();
       if(strMethod != "getwork" && strMethod != "getmemorypool")
         printf("ThreadRPCServer method=%s\n", strMethod.c_str());
@@ -2978,35 +2990,20 @@ void ThreadRPCServer2(void* parg)
       else if(valParams.type() == null_type)
         params = Array();
       else
-        throw JSONRPCError(-32600, "Params must be an array");
-
-      // Find method
-      const CRPCCommand *pcmd = tableRPC[strMethod];
-      if(!pcmd)
-        throw JSONRPCError(-32601, "Method not found");
-
-      // Observe safe mode
-      string strWarning = GetWarnings("rpc");
-      if(strWarning != "" && !GetBoolArg("-disablesafemode") &&
-         !pcmd->okSafeMode)
-        throw JSONRPCError(-2, string("Safe mode: ") + strWarning);
+        throw JSONRPCError(RPC_INVALID_REQUEST, "Params must be an array");
 
       try
       {
         // Execute
-        Value result;
-        {
-          LOCK2(cs_main, pwalletMain->cs_wallet);
-          result = pcmd->actor(params, false);
-        }
+        Value result = tableRPC.execute(strMethod, params);
 
         // Send reply
         string strReply = JSONRPCReply(result, Value::null, id);
-        stream << HTTPReply(200, strReply) << std::flush;
+        stream << HTTPReply(HTTP_OK, strReply) << std::flush;
       }
-      catch (std::exception& e)
+      catch(std::exception& e)
       {
-        ErrorReply(stream, JSONRPCError(-1, e.what()), id);
+        ErrorReply(stream, JSONRPCError(RPC_MISC_ERROR, e.what()), id);
       }
     }
     catch (Object& objError)
@@ -3015,13 +3012,40 @@ void ThreadRPCServer2(void* parg)
     }
     catch (std::exception& e)
     {
-      ErrorReply(stream, JSONRPCError(-32700, e.what()), id);
+      ErrorReply(stream, JSONRPCError(RPC_PARSE_ERROR, e.what()), id);
     }
   }
 }
 
+json_spirit::Value CRPCTable::execute(const std::string &strMethod, const json_spirit::Array &params) const
+{
+  // Find method
+  const CRPCCommand *pcmd = tableRPC[strMethod];
+  if(!pcmd)
+    throw JSONRPCError(RPC_METHOD_NOT_FOUND, "Method not found");
+
+  // Observe safe mode
+  string strWarning = GetWarnings("rpc");
+  if(strWarning != "" && !GetBoolArg("-disablesafemode") &&
+      !pcmd->okSafeMode)
+    throw JSONRPCError(RPC_FORBIDDEN_BY_SAFE_MODE, string("Safe mode: ") + strWarning);
 
 
+  try
+  {
+    // Execute
+    Value result;
+    {
+      LOCK2(cs_main, pwalletMain->cs_wallet);
+      result = pcmd->actor(params, false);
+    }
+    return result;
+  }
+  catch(std::exception& e)
+  {
+    throw JSONRPCError(RPC_MISC_ERROR, e.what());
+  }
+}
 
 Object CallRPC(const string& strMethod, const Array& params)
 {
@@ -3094,6 +3118,75 @@ void ConvertTo(Value& value)
   }
 }
 
+// Convert strings to command-specific RPC representation
+Array RPCConvertValues(const std::string &strMethod, const std::vector<std::string> &strParams)
+{
+  // Parameters default to strings
+    Array params;
+    BOOST_FOREACH(const std::string &param, strParams)
+        params.push_back(param);
+
+    int n = params.size();
+
+  //
+  // Special case non-string parameter types
+  //
+  if(strMethod == "setgenerate"            && n > 0) ConvertTo<bool>            (params[0]);
+  if(strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+  if(strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>          (params[1]);
+  if(strMethod == "settxfee"               && n > 0) ConvertTo<double>          (params[0]);
+  if(strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+  if(strMethod == "getreceivedbyaccount"   && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+  if(strMethod == "listreceivedbyaddress"  && n > 0) ConvertTo<boost::int64_t>  (params[0]);
+  if(strMethod == "listreceivedbyaddress"  && n > 1) ConvertTo<bool>            (params[1]);
+  if(strMethod == "listreceivedbyaccount"  && n > 0) ConvertTo<boost::int64_t>  (params[0]);
+  if(strMethod == "listreceivedbyaccount"  && n > 1) ConvertTo<bool>            (params[1]);
+  if(strMethod == "getbalance"             && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+  if(strMethod == "getblockhash"           && n > 0) ConvertTo<boost::int64_t>  (params[0]);
+  if(strMethod == "getblock"               && n > 1) ConvertTo<bool>            (params[1]);
+  if(strMethod == "move"                   && n > 2) ConvertTo<double>          (params[2]);
+  if(strMethod == "move"                   && n > 3) ConvertTo<boost::int64_t>  (params[3]);
+  if(strMethod == "sendfrom"               && n > 2) ConvertTo<double>          (params[2]);
+  if(strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>  (params[3]);
+  if(strMethod == "calcburnhash"           && n > 0) ConvertTo<bool>            (params[0]);
+  if(strMethod == "burncoins"              && n > 1) ConvertTo<double>          (params[1]);
+  if(strMethod == "burncoins"              && n > 2) ConvertTo<boost::int64_t>  (params[2]);
+  if(strMethod == "listtransactions"       && n > 1) ConvertTo<bool>            (params[1]);
+  if(strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>  (params[2]);
+  if(strMethod == "listtransactions"       && n > 3) ConvertTo<boost::int64_t>  (params[3]);
+  if(strMethod == "listaccounts"           && n > 0) ConvertTo<boost::int64_t>  (params[0]);
+  if(strMethod == "walletpassphrase"       && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+  if(strMethod == "walletpassphrase"       && n > 2) ConvertTo<bool>            (params[2]);
+  if(strMethod == "listsinceblock"         && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+  if(strMethod == "sendalert"              && n > 2) ConvertTo<boost::int64_t>  (params[2]);
+  if(strMethod == "sendalert"              && n > 3) ConvertTo<boost::int64_t>  (params[3]);
+  if(strMethod == "sendalert"              && n > 4) ConvertTo<boost::int64_t>  (params[4]);
+  if(strMethod == "sendalert"              && n > 5) ConvertTo<boost::int64_t>  (params[5]);
+  if(strMethod == "sendalert"              && n > 6) ConvertTo<boost::int64_t>  (params[6]);
+  if(strMethod == "sendmany"               && n > 1)
+  {
+    string s = params[1].get_str();
+    Value v;
+    if(!read_string(s, v) || v.type() != obj_type)
+      throw runtime_error("type mismatch");
+    params[1] = v.get_obj();
+  }
+  if(strMethod == "sendmany"               && n > 2) ConvertTo<boost::int64_t>  (params[2]);
+  if(strMethod == "reservebalance"         && n > 0) ConvertTo<bool>            (params[0]);
+  if(strMethod == "reservebalance"         && n > 1) ConvertTo<double>          (params[1]);
+  if(strMethod == "addmultisigaddress"     && n > 0) ConvertTo<boost::int64_t>  (params[0]);
+  if(strMethod == "addmultisigaddress"     && n > 1)
+  {
+    string s = params[1].get_str();
+    Value v;
+    if(!read_string(s, v) || v.type() != array_type)
+      throw runtime_error("type mismatch "+s);
+    params[1] = v.get_array();
+  }
+  
+  return params;
+}
+
 int CommandLineRPC(int argc, char *argv[])
 {
   string strPrint;
@@ -3113,66 +3206,8 @@ int CommandLineRPC(int argc, char *argv[])
     string strMethod = argv[1];
 
     // Parameters default to strings
-    Array params;
-    for(int i = 2; i < argc; i++)
-      params.push_back(argv[i]);
-    int n = params.size();
-
-    //
-    // Special case non-string parameter types
-    //
-    if(strMethod == "setgenerate"            && n > 0) ConvertTo<bool>            (params[0]);
-    if(strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>  (params[1]);
-    if(strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>          (params[1]);
-    if(strMethod == "settxfee"               && n > 0) ConvertTo<double>          (params[0]);
-    if(strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>  (params[1]);
-    if(strMethod == "getreceivedbyaccount"   && n > 1) ConvertTo<boost::int64_t>  (params[1]);
-    if(strMethod == "listreceivedbyaddress"  && n > 0) ConvertTo<boost::int64_t>  (params[0]);
-    if(strMethod == "listreceivedbyaddress"  && n > 1) ConvertTo<bool>            (params[1]);
-    if(strMethod == "listreceivedbyaccount"  && n > 0) ConvertTo<boost::int64_t>  (params[0]);
-    if(strMethod == "listreceivedbyaccount"  && n > 1) ConvertTo<bool>            (params[1]);
-    if(strMethod == "getbalance"             && n > 1) ConvertTo<boost::int64_t>  (params[1]);
-    if(strMethod == "getblockhash"           && n > 0) ConvertTo<boost::int64_t>  (params[0]);
-    if(strMethod == "getblock"               && n > 1) ConvertTo<bool>            (params[1]);
-    if(strMethod == "move"                   && n > 2) ConvertTo<double>          (params[2]);
-    if(strMethod == "move"                   && n > 3) ConvertTo<boost::int64_t>  (params[3]);
-    if(strMethod == "sendfrom"               && n > 2) ConvertTo<double>          (params[2]);
-    if(strMethod == "sendfrom"               && n > 3) ConvertTo<boost::int64_t>  (params[3]);
-    if(strMethod == "calcburnhash"           && n > 0) ConvertTo<bool>            (params[0]);
-    if(strMethod == "burncoins"              && n > 1) ConvertTo<double>          (params[1]);
-    if(strMethod == "burncoins"              && n > 2) ConvertTo<boost::int64_t>  (params[2]);
-    if(strMethod == "listtransactions"       && n > 1) ConvertTo<bool>            (params[1]);
-    if(strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>  (params[2]);
-    if(strMethod == "listtransactions"       && n > 3) ConvertTo<boost::int64_t>  (params[3]);
-    if(strMethod == "listaccounts"           && n > 0) ConvertTo<boost::int64_t>  (params[0]);
-    if(strMethod == "walletpassphrase"       && n > 1) ConvertTo<boost::int64_t>  (params[1]);
-    if(strMethod == "walletpassphrase"       && n > 2) ConvertTo<bool>            (params[2]);
-    if(strMethod == "listsinceblock"         && n > 1) ConvertTo<boost::int64_t>  (params[1]);
-    if(strMethod == "sendalert"              && n > 2) ConvertTo<boost::int64_t>  (params[2]);
-    if(strMethod == "sendalert"              && n > 3) ConvertTo<boost::int64_t>  (params[3]);
-    if(strMethod == "sendalert"              && n > 4) ConvertTo<boost::int64_t>  (params[4]);
-    if(strMethod == "sendalert"              && n > 5) ConvertTo<boost::int64_t>  (params[5]);
-    if(strMethod == "sendalert"              && n > 6) ConvertTo<boost::int64_t>  (params[6]);
-    if(strMethod == "sendmany"               && n > 1)
-    {
-      string s = params[1].get_str();
-      Value v;
-      if(!read_string(s, v) || v.type() != obj_type)
-        throw runtime_error("type mismatch");
-      params[1] = v.get_obj();
-    }
-    if(strMethod == "sendmany"               && n > 2) ConvertTo<boost::int64_t>  (params[2]);
-    if(strMethod == "reservebalance"         && n > 0) ConvertTo<bool>            (params[0]);
-    if(strMethod == "reservebalance"         && n > 1) ConvertTo<double>          (params[1]);
-    if(strMethod == "addmultisigaddress"     && n > 0) ConvertTo<boost::int64_t>  (params[0]);
-    if(strMethod == "addmultisigaddress"     && n > 1)
-    {
-      string s = params[1].get_str();
-      Value v;
-      if(!read_string(s, v) || v.type() != array_type)
-        throw runtime_error("type mismatch "+s);
-      params[1] = v.get_array();
-    }
+    std::vector<std::string> strParams(&argv[2], &argv[argc]);
+    Array params = RPCConvertValues(strMethod, strParams);
 
     // Execute
     Object reply = CallRPC(strMethod, params);

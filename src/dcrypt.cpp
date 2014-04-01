@@ -13,21 +13,22 @@
 //the base size for realloc will be 1MB
 #define REALLOC_BASE_SZ   (1024 * 1024)
 
-class Extend_Array
+typedef struct
 {
-public:
-  Extend_Array()
-  {
-    //initial values
-    array = 0;
-    actual_array_sz = 0;
-    times_realloced = 0;
-  }
-
   uint8_t *array;
   unsigned long long actual_array_sz;
   uint32_t times_realloced;
-};
+
+} Extend_Array;
+
+inline void Extend_Array_init(Extend_Array *ExtArray)
+{
+  //initial values
+  ExtArray->array = 0;
+  ExtArray->actual_array_sz = 0;
+  ExtArray->times_realloced = 0;
+  return;
+}
 
 uint32_t hex_char_to_int(uint8_t c)
 {
@@ -56,24 +57,24 @@ void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz,
     return;
 
   //make a few references
-  unsigned long long &actual_array_sz = extend_array->actual_array_sz;
-  uint32_t &times_realloced = extend_array->times_realloced;
+  unsigned long long *actual_array_sz = &extend_array->actual_array_sz;
+  uint32_t *times_realloced = &extend_array->times_realloced;
 
   //if there is not enough room
-  if((actual_array_sz - used_array_sz) < (extend_sz + hashed_end))
+  if((*actual_array_sz - used_array_sz) < (extend_sz + hashed_end))
   {
     //if extend_array->array has already been malloc'd
-    if(times_realloced)
+    if(*times_realloced)
     {
       //reallocate on an exponential curve, modern computers have plenty ram
-      actual_array_sz += pow(2, times_realloced++) * REALLOC_BASE_SZ;
-      extend_array->array = (uint8_t*)realloc(extend_array->array, actual_array_sz);
+      *actual_array_sz += pow(2, (*times_realloced)++) * REALLOC_BASE_SZ;
+      extend_array->array = (uint8_t*)realloc(extend_array->array, *actual_array_sz);
     }else{
       //allocate the base size
-      actual_array_sz += REALLOC_BASE_SZ;
-      times_realloced++;
+      *actual_array_sz += REALLOC_BASE_SZ;
+      (*times_realloced)++;
 
-      extend_array->array = (uint8_t*)malloc(actual_array_sz); //if we have not allocated anything, malloc
+      extend_array->array = (uint8_t*)malloc(*actual_array_sz); //if we have not allocated anything, malloc
     }
   }
 
@@ -180,6 +181,8 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
 
   //initialize the class for the extend hash
   Extend_Array new_hash;
+
+  Extend_Array_init(&new_hash);
 
   //set the first hash length in the temp array to all 0xff
   memset(tmp_array, 0xff, SHA256_LEN);

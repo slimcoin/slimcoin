@@ -109,9 +109,11 @@ public:
       for(int update_idx = updated_sorted.size()-1; update_idx >= 0; --update_idx)
       {
         const uint256 &hash = updated_sorted.at(update_idx);
+
         // Find transaction in wallet
         std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(hash);
         bool inWallet = mi != wallet->mapWallet.end();
+
         // Find bounds of this transaction in model
         QList<TransactionRecord>::iterator lower = qLowerBound(
           cachedWallet.begin(), cachedWallet.end(), hash, TxLessThan());
@@ -123,9 +125,7 @@ public:
         // Determine if transaction is in model already
         bool inModel = false;
         if(lower != upper)
-        {
           inModel = true;
-        }
 
 #ifdef WALLET_UPDATE_DEBUG
         qDebug() << "  " << QString::fromStdString(hash.ToString()) << inWallet << " " << inModel
@@ -134,9 +134,17 @@ public:
 
         if(inWallet && !inModel)
         {
+          if(!mapBlockIndex.count(mi->second.hashBlock))
+            continue;
+
+          CBlockIndex *pindex = mapBlockIndex[mi->second.hashBlock];
+          if(!pindex)
+            continue;
+
           // Added -- insert at the right position
           QList<TransactionRecord> toInsert =
-            TransactionRecord::decomposeTransaction(wallet, mi->second);
+            TransactionRecord::decomposeTransaction(wallet, mi->second, pindex->IsProofOfBurn());
+
           if(!toInsert.isEmpty()) /* only if something to insert */
           {
             parent->beginInsertRows(QModelIndex(), lowerIndex, lowerIndex+toInsert.size()-1);
@@ -386,6 +394,8 @@ QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx
   case TransactionRecord::SendToAddress:
   case TransactionRecord::SendToOther:
     return QIcon(":/icons/tx_output");
+  case TransactionRecord::BurnMint:
+    return QIcon(":/icons/Burn_mint");
   case TransactionRecord::Burned:
     return QIcon(":/icons/tx_burn");
   default:

@@ -26,6 +26,7 @@
 #include "askpassphrasedialog.h"
 #include "notificator.h"
 #include "guiutil.h"
+#include "rpcconsole.h"
 #include "wallet.h"
 
 #ifdef Q_WS_MAC
@@ -164,6 +165,9 @@ trayIcon(0),
   // Doubleclicking on a transaction on the transaction history page shows details
   connect(transactionView, SIGNAL(doubleClicked(QModelIndex)), transactionView, SLOT(showDetails()));
 
+  rpcConsole = new RPCConsole(this);
+  connect(openRPCConsoleAction, SIGNAL(triggered()), rpcConsole, SLOT(show()));
+
   gotoOverviewPage();
 }
 
@@ -261,6 +265,9 @@ void BitcoinGUI::createActions()
   changePassphraseAction = new QAction(QIcon(":/icons/key"), tr("&Change Passphrase"), this);
   changePassphraseAction->setToolTip(tr("Change the passphrase used for wallet encryption"));
 
+  openRPCConsoleAction = new QAction(QIcon(":/icons/debugwindow"), tr("&Debug window"), this);
+  openRPCConsoleAction->setStatusTip(tr("Open debugging and diagnostic console"));
+
   connect(quitAction, SIGNAL(triggered()), qApp, SLOT(quit()));
   connect(optionsAction, SIGNAL(triggered()), this, SLOT(optionsClicked()));
   connect(aboutAction, SIGNAL(triggered()), this, SLOT(aboutClicked()));
@@ -298,6 +305,8 @@ void BitcoinGUI::createMenuBar()
   settings->addAction(optionsAction);
 
   QMenu *help = appMenuBar->addMenu(tr("&Help"));
+  help->addAction(openRPCConsoleAction);
+  help->addSeparator();
   help->addAction(aboutAction);
   help->addAction(aboutQtAction);
 }
@@ -351,6 +360,8 @@ void BitcoinGUI::setClientModel(ClientModel *clientModel)
 
     // Report errors from network/worker thread
     connect(clientModel, SIGNAL(error(QString,QString, bool)), this, SLOT(error(QString,QString,bool)));
+
+    rpcConsole->setClientModel(clientModel);
   }
 }
 
@@ -418,6 +429,7 @@ void BitcoinGUI::createTrayIcon()
   trayIconMenu->addSeparator();
   trayIconMenu->addAction(quitAction);
 #endif
+  trayIconMenu->addAction(openRPCConsoleAction);
 
   notificator = new Notificator(tr("Slimcoin-qt"), trayIcon);
 }
@@ -644,7 +656,7 @@ void BitcoinGUI::askFee(qint64 nFeeRequired, bool *payFee)
   *payFee = (retval == QMessageBox::Yes);
 }
 
-void BitcoinGUI::incomingTransaction(const QModelIndex & parent, int start, int end)
+void BitcoinGUI::incomingTransaction(const QModelIndex &parent, int start, int end)
 {
   if(!walletModel || !clientModel)
     return;
