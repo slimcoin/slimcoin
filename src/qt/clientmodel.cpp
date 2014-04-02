@@ -42,23 +42,27 @@ void ClientModel::update()
 {
   int newNumConnections = getNumConnections();
   int newNumBlocks = getNumBlocks();
+  int newNumBlocksOfPeers = getNumBlocksOfPeers();
   QString newStatusBar = getStatusBarWarnings();
 
   if(cachedNumConnections != newNumConnections)
     emit numConnectionsChanged(newNumConnections);
-  if(cachedNumBlocks != newNumBlocks || cachedStatusBar != newStatusBar)
+  if(cachedNumBlocks != newNumBlocks || cachedStatusBar != newStatusBar || 
+     cachedNumBlocksOfPeers != newNumBlocksOfPeers)
   {
+
+    cachedNumConnections = newNumConnections;
+    cachedNumBlocks = newNumBlocks;
+    cachedNumBlocksOfPeers = newNumBlocksOfPeers;
+    cachedStatusBar = newStatusBar;
+
     // Simply emit a numBlocksChanged for now in case the status message changes,
     // so that the view updates the status bar.
     // TODO: It should send a notification.
     //    (However, this might generate looped notifications and needs to be thought through and tested carefully)
     //    error(tr("Network Alert"), newStatusBar);
-    emit numBlocksChanged(newNumBlocks);
+    emit numBlocksChanged(newNumBlocks, std::max(newNumBlocksOfPeers, newNumBlocks));
   }
-
-  cachedNumConnections = newNumConnections;
-  cachedNumBlocks = newNumBlocks;
-  cachedStatusBar = newStatusBar;
 }
 
 bool ClientModel::isTestNet() const

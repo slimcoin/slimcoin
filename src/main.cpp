@@ -1885,28 +1885,11 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 
 //MYTODO: 
 //
-//Somehow fix the thing where many good PoB blocks will be flying in, I feel this will cause a lot of forks
-//
 //GetProofOfBurnReward() uses GetPoWReward inside
-//
-//Changed getNextBurnTarget to get the nBurnBits from past blocks based on BURN_MIN_CONFIRMS
-// test BURN_MIN_CONFIRMS that is not 1 with weather when new coins are burnded, 
-//      they will not be factored into the difficulty
 //
 //If I plan to change the hashing algo, I will also need to change the checkpoints nStakeModifierChecksum
 //
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//
-//fixed the REORGANIZE BLOCK hanging when BurnCheckPubKey(), but not really extensivly tested
-//
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-//
-//TODO: make setNumBlocks in RPC
-//
+
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2112,9 +2095,9 @@ bool CBlock::AcceptBlock()
   //Test PoB data before accepting
   if(IsProofOfBurn())
   {
-    //the previous block cannot be a PoB block
-    if(mapBlockIndex[hashPrevBlock]->IsProofOfBurn())
-      return DoS(100, error("AcceptBlock() : previous block is proof-of-burn block"));
+    //the previous block must be a PoW block
+    if(!mapBlockIndex[hashPrevBlock]->IsProofOfWork())
+      return DoS(100, error("AcceptBlock() : previous block is not a proof-of-work block"));
 
     CBlockIndex *pBurnIndex = pindexByHeight(burnBlkHeight);
     if(!pBurnIndex || hashBurnBlock != pBurnIndex->GetBlockHash())

@@ -48,13 +48,14 @@ private:
 
   int cachedNumConnections;
   int cachedNumBlocks;
+  int cachedNumBlocksOfPeers;
   QString cachedStatusBar;
 
   int numBlocksAtStartup;
 
 signals:
   void numConnectionsChanged(int count);
-  void numBlocksChanged(int count);
+  void numBlocksChanged(int count, int countOfPeers);
 
   //! Asynchronous error notification
   void error(const QString &title, const QString &message, bool modal);

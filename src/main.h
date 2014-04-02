@@ -120,7 +120,7 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 
 #define BURN_HASH_COUNT    1       //the amount of hashes to be done when getting the smallest hash
 #define BURN_MIN_CONFIRMS  6       //a burn tx requires atleast x > 6 confimations, BURN_MIN_CONFIMS must be > 0
-#define BURN_HARDER_TARGET 6     //make the burn target 0.5 times the intermediate calculated target
+#define BURN_HARDER_TARGET 0.5     //make the burn target 0.5 times the intermediate calculated target
 
 //keeps things safe
 #if BURN_MIN_CONFIRMS < 1
