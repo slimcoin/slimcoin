@@ -34,6 +34,7 @@ unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
+set<pair<CScript, uint256> > setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
@@ -54,6 +55,7 @@ map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
+set<pair<CScript, uint256> > setBurnSeenOrphan;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -1889,7 +1891,12 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //If I plan to change the hashing algo, I will also need to change the checkpoints nStakeModifierChecksum
 //
-
+//Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
+//
+//Also, desktop's burn TX's are rejected, add a breakpoint in CScript::comparePubKeySignature() and one in 
+//  CBlock::BurnCheckPubKeys()
+//What I think is the issue is that the GetAllTxClassesByIndex fails because I rescrambled the blocks
+//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -1944,6 +1951,9 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
   if(pindexNew->IsProofOfStake())
     setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
+  else if(pindexNew->IsProofOfBurn())
+    setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, *pindexNew->pprev->phashBlock));
+
   pindexNew->phashBlock = &((*mi).first);
 
   // Write to disk block index
@@ -2108,12 +2118,12 @@ bool CBlock::AcceptBlock()
     if(!CheckBurnEffectiveCoins(&calcEffCoins))
       return DoS(50, error("AcceptBlock() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d, nEffectiveBurnCoins, calcEffCoins));
 
-    // Check proof-of-burn matches claimed amount
+    // Check proof-of-burn hash matches claimed amount
     if(!CheckProofOfBurn(GetBurnHash(), nBurnBits))
-      return DoS(50, error("AcceptBlock() : proof-of-burn failed"));
+      return DoS(100, error("AcceptBlock() : proof-of-burn failed"));
 
     if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
-      return DoS(50, error("AcceptBlock() : Public signatures do not match with burn transactions's"));
+      return DoS(100, error("AcceptBlock() : Public signatures do not match with burn transactions's"));
   }
 
   CBlockIndex* pindexPrev = (*mi).second;
@@ -2125,7 +2135,7 @@ bool CBlock::AcceptBlock()
 
   // Check proof-of-burn bits
   if(nBurnBits != GetNextBurnTargetRequired(pindexPrev))
-    return DoS(100, error("AcceptBlock() : incorrect proof-of-burn nBits"));
+    return DoS(100, error("AcceptBlock() : incorrect proof-of-burn nBurnBits"));
 
   // Check timestamp against prev
   if(GetBlockTime() <= pindexPrev->GetMedianTimePast() || 
@@ -2179,19 +2189,29 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 
   if(mapBlockIndex.count(hash))
     return error("ProcessBlock() : already have block %d %s", 
-                 mapBlockIndex[hash]->nHeight, hash.ToString().substr(0,20).c_str());
+                 mapBlockIndex[hash]->nHeight, hash.ToString().substr(0, 20).c_str());
 
   if(mapOrphanBlocks.count(hash))
-    return error("ProcessBlock() : already have block (orphan) %s", hash.ToString().substr(0,20).c_str());
+    return error("ProcessBlock() : already have block (orphan) %s", hash.ToString().substr(0, 20).c_str());
 
   // slimcoin: check proof-of-stake
   // Limited duplicity on stake: prevents block flood attack
-  // Duplicate stake allowed only when there is orphan child block
+  // Duplicate stake allowed only when there is an orphan child block
   if(pblock->IsProofOfStake() && setStakeSeen.count(pblock->GetProofOfStake()) && 
      !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
     return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for block %s", 
-                 pblock->GetProofOfStake().first.ToString().c_str(), 
-                 pblock->GetProofOfStake().second, hash.ToString().c_str());
+                 pblock->GetProofOfStake().first.ToString().c_str(), pblock->GetProofOfStake().second, 
+                 hash.ToString().c_str());
+
+  // slimcoin: check proof-of-burn
+  // Limited duplicity of burn blocks: prevents block flood attack
+  // Duplicate burn block allowed only when there is an orphan child block
+  if(pblock->IsProofOfBurn() && setBurnSeen.count(pblock->GetProofOfBurn()) && 
+     !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
+    return error("ProcessBlock() : duplicate proof-of-burn (%s, %s) for block %s", 
+                 pblock->GetProofOfBurn().first.ToString().c_str(), 
+                 pblock->GetProofOfBurn().second.ToString().substr(0, 20).c_str(), 
+                 hash.ToString().c_str());
 
   // Preliminary checks
   if(!pblock->CheckBlock())
@@ -2256,11 +2276,26 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
       if(setStakeSeenOrphan.count(pblock2->GetProofOfStake()) && !mapOrphanBlocksByPrev.count(hash) && 
          !Checkpoints::WantedByPendingSyncCheckpoint(hash))
       {
-        return error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for orphan block %s", 
-                     pblock2->GetProofOfStake().first.ToString().c_str(), 
-                     pblock2->GetProofOfStake().second, hash.ToString().c_str());
+        error("ProcessBlock() : duplicate proof-of-stake (%s, %d) for orphan block %s", 
+              pblock2->GetProofOfStake().first.ToString().c_str(), 
+              pblock2->GetProofOfStake().second, hash.ToString().c_str());
+        delete pblock2;
+        return false;
       }else
         setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
+    }else if(pblock2->IsProofOfBurn())
+    {
+      if(setBurnSeenOrphan.count(pblock2->GetProofOfBurn()) && !mapOrphanBlocksByPrev.count(hash) && 
+         !Checkpoints::WantedByPendingSyncCheckpoint(hash))
+      {
+        error("ProcessBlock() : duplicate proof-of-burn (%s, %s) for orphan block %s", 
+              pblock2->GetProofOfBurn().first.ToString().c_str(), 
+              pblock2->GetProofOfBurn().second.ToString().substr(0, 20).c_str(), 
+              hash.ToString().c_str());
+        delete pblock2;
+        return false;
+      }else
+        setBurnSeenOrphan.insert(pblock2->GetProofOfBurn());
     }
 
     mapOrphanBlocks.insert(make_pair(hash, pblock2));
@@ -2301,6 +2336,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 
       mapOrphanBlocks.erase(pblockOrphan->GetHash());
       setStakeSeenOrphan.erase(pblockOrphan->GetProofOfStake());
+      setBurnSeenOrphan.erase(pblockOrphan->GetProofOfBurn());
       delete pblockOrphan;
     }
 
@@ -4114,8 +4150,8 @@ void HashAllBurntTx(uint256 &smallestHashRet, CWalletTx &smallestWTxRet)
   //give the smallest hash the absolute largest value it can hold
   smallestHashRet = ~uint256(0);
 
-  //if the best index is a proof-of-burn index, do not bother hashing as it will throw errors
-  if(pindexBest->IsProofOfBurn())
+  //if the best index is not a proof-of-work index, do not bother hashing as it will throw errors
+  if(!pindexBest->IsProofOfWork())
     return;
 
   //go through all of the burnt hashes in the setBurnHashes

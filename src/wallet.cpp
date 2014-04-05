@@ -1234,8 +1234,8 @@ bool CWallet::CreateTransaction(CScript scriptPubKey, int64 nValue, CWalletTx& w
 }
 
 // slimcoin: create coin stake transaction
-bool CWallet::CreateCoinStake(const CKeyStore& keystore, unsigned int nBits, 
-                              int64 nSearchInterval, CTransaction& txNew)
+bool CWallet::CreateCoinStake(const CKeyStore &keystore, unsigned int nBits, 
+                              int64 nSearchInterval, CTransaction &txNew)
 {
   // The following split & combine thresholds are important to security
   // Should not be adjusted if you don't understand the consequences

@@ -1038,7 +1038,7 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, co
 
 
 
-uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType)
+uint256 SignatureHash(CScript scriptCode, const CTransaction &txTo, unsigned int nIn, int nHashType)
 {
   if(nIn >= txTo.vin.size())
   {
@@ -1579,14 +1579,14 @@ bool VerifyScript(const CScript &scriptSig, const CScript &scriptPubKey, const C
 }
 
 
-bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, 
-                   CTransaction& txTo, unsigned int nIn, int nHashType)
+bool SignSignature(const CKeyStore &keystore, const CTransaction &txFrom, 
+                   CTransaction &txTo, unsigned int nIn, int nHashType)
 {
   assert(nIn < txTo.vin.size());
-  CTxIn& txin = txTo.vin[nIn];
+  CTxIn &txin = txTo.vin[nIn];
   assert(txin.prevout.n < txFrom.vout.size());
   assert(txin.prevout.hash == txFrom.GetHash());
-  const CTxOut& txout = txFrom.vout[txin.prevout.n];
+  const CTxOut &txout = txFrom.vout[txin.prevout.n];
 
   // Leave out the signature from the hash, since a signature can't sign itself.
   // The checksig op will also drop the signatures from its hash.

@@ -605,6 +605,7 @@ bool CTxDB::LoadBlockIndex()
         pindexNew->burnCTxOut     = diskindex.burnCTxOut;
         pindexNew->nEffectiveBurnCoins = diskindex.nEffectiveBurnCoins;
         pindexNew->nBurnBits      = diskindex.nBurnBits;
+        pindexNew->burnScriptPubKey = diskindex.burnScriptPubKey;
 
         // Watch for genesis block
         if(pindexGenesisBlock == NULL && diskindex.GetBlockHash() == hashGenesisBlock)
@@ -616,13 +617,17 @@ bool CTxDB::LoadBlockIndex()
         // slimcoin: build setStakeSeen
         if(pindexNew->IsProofOfStake())
           setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
+        else if(pindexNew->IsProofOfBurn() && //build the setBurnSeen
+                pindexNew->pprev && pindexNew->pprev->phashBlock)
+          setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, *pindexNew->pprev->phashBlock));
+
       }else
         break; // if shutdown requested or finished loading block index
 
     }    // try
     catch(std::exception &e)
     {
-      return error("%s : deserialize error", __PRETTY_FUNCTION__);
+      return error("LoadBlockIndex() : deserialize error");
     }
   }
 

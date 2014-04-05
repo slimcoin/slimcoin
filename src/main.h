@@ -76,6 +76,7 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
+extern std::set<std::pair<CScript, uint256> > setBurnSeen;
 extern uint256 hashGenesisBlock;
 extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
@@ -1171,6 +1172,17 @@ public:
       std::make_pair(COutPoint(), (unsigned int)0);
   }
 
+  std::pair<CScript, uint256> GetProofOfBurn() const
+  {
+    if(vtx.size() == 0 || !vtx[0].IsCoinBase() || !IsProofOfBurn())
+    {
+      CScript scriptNull;
+      scriptNull.clear();
+      return std::make_pair(scriptNull, (uint256)0);
+    }else
+      return std::make_pair(vtx[0].vout[0].scriptPubKey, hashPrevBlock);
+  }
+
   // slimcoin: get max transaction timestamp
   int64 GetMaxTransactionTime() const
   {
@@ -1396,6 +1408,7 @@ public:
   s32int burnCTxOut;
   int64 nEffectiveBurnCoins;
   u32int nBurnBits;
+  CScript burnScriptPubKey; //the coinbases' output's scriptPubKey
 
   CBlockIndex()
   {
@@ -1428,9 +1441,10 @@ public:
     burnCTxOut     = -1;
     nEffectiveBurnCoins = 0;
     nBurnBits      = 0;
+    burnScriptPubKey.clear();
   }
 
-  CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock& block)
+  CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock &block)
   {
     phashBlock = NULL;
     pprev = NULL;
@@ -1470,6 +1484,11 @@ public:
     nEffectiveBurnCoins = block.nEffectiveBurnCoins;
     nBurnBits      = block.nBurnBits;
 
+    if(block.IsProofOfBurn())
+      burnScriptPubKey = block.GetProofOfBurn().first;
+    else
+      burnScriptPubKey.clear();
+
   }
 
   CBlock GetBlockHeader() const
@@ -1503,7 +1522,7 @@ public:
     bnTarget.SetCompact(nBits);
     if (bnTarget <= 0)
       return 0;
-    return (IsProofOfStake()? (CBigNum(1)<<256) / (bnTarget+1) : 1);
+    return (IsProofOfStake() ? (CBigNum(1)<<256) / (bnTarget+1) : 1);
   }
 
   bool IsInMainChain() const
@@ -1517,9 +1536,13 @@ public:
            nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
            fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
 
+    //The burn and stake data will be checked after all block indexes have been loaded
+
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
-    else if(IsProofOfBurn() || IsProofOfStake()) //it will check these after all of the block indexes are loaded
+    else if(IsProofOfBurn()) 
+      return !burnScriptPubKey.empty();
+    else if(IsProofOfStake())
       return true;
     else
       return false;
@@ -1695,6 +1718,7 @@ public:
       READWRITE(burnCTxOut);
       READWRITE(nEffectiveBurnCoins);
       READWRITE(nBurnBits);
+      READWRITE(burnScriptPubKey);
       )
 
     uint256 GetBlockHash() const
