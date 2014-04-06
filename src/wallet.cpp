@@ -300,7 +300,8 @@ void CWallet::WalletUpdateSpent(const CTransaction &tx)
         CWalletTx& wtx = (*mi).second;
         if(!wtx.IsSpent(txin.prevout.n) && IsMine(wtx.vout[txin.prevout.n]))
         {
-          printf("WalletUpdateSpent found spent coin %sslm %s\n", FormatMoney(wtx.GetCredit()).c_str(), wtx.GetHash().ToString().c_str());
+          printf("WalletUpdateSpent found spent coin %sslm %s\n", 
+                 FormatMoney(wtx.GetCredit()).c_str(), wtx.GetHash().ToString().c_str());
           wtx.MarkSpent(txin.prevout.n);
           wtx.WriteToDisk();
           vWalletUpdated.push_back(txin.prevout.hash);
@@ -319,7 +320,7 @@ void CWallet::MarkDirty()
   }
 }
 
-bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fBurnTx)
+bool CWallet::AddToWallet(const CWalletTx &wtxIn, bool fBurnTx)
 {
   uint256 hash = wtxIn.GetHash();
   {
@@ -402,24 +403,26 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fBurnTx)
 // Add a transaction to the wallet, or update it.
 // pblock is optional, but should be provided if the transaction is known to be in a block.
 // If fUpdate is true, existing transactions will be updated.
-bool CWallet::AddToWalletIfInvolvingMe(const CTransaction& tx, const CBlock* pblock, bool fUpdate, bool fFindBlock)
+bool CWallet::AddToWalletIfInvolvingMe(const CTransaction &tx, const CBlock *pblock, bool fUpdate, bool fFindBlock)
 {
   uint256 hash = tx.GetHash();
   {
     LOCK(cs_wallet);
     bool fExisted = mapWallet.count(hash);
-    if(fExisted && !fUpdate) return false;
+    if(fExisted && !fUpdate) 
+      return false;
+
     if(fExisted || IsMine(tx) || IsFromMe(tx))
     {
-      CWalletTx wtx(this,tx);
+      CWalletTx wtx(this, tx);
       // Get merkle branch if transaction was found in a block
       if(pblock)
         wtx.SetMerkleBranch(pblock);
       return AddToWallet(wtx, wtx.IsBurnTx());
-    }
-    else
+    }else
       WalletUpdateSpent(tx);
   }
+
   return false;
 }
 
@@ -695,18 +698,22 @@ bool CWalletTx::WriteToDisk(bool fBurnTx)
 // Scan the block chain (starting in pindexStart) for transactions
 // from or to us. If fUpdate is true, found transactions that already
 // exist in the wallet will be updated.
-int CWallet::ScanForWalletTransactions(CBlockIndex* pindexStart, bool fUpdate)
+int CWallet::ScanForWalletTransactions(CBlockIndex *pindexStart, bool fUpdate)
 {
   int ret = 0;
 
-  CBlockIndex* pindex = pindexStart;
+  //if fUpdate is true, it will do a full update, so also clear the setBurnHashes
+  if(fUpdate)
+    setBurnHashes.clear();
+
+  CBlockIndex *pindex = pindexStart;
   {
     LOCK(cs_wallet);
     while(pindex)
     {
       CBlock block;
       block.ReadFromDisk(pindex, true);
-      BOOST_FOREACH(CTransaction& tx, block.vtx)
+      BOOST_FOREACH(CTransaction &tx, block.vtx)
       {
         if(AddToWalletIfInvolvingMe(tx, &block, fUpdate))
           ret++;

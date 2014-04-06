@@ -771,6 +771,22 @@ int CMerkleTx::GetDepthInMainChain(CBlockIndex* &pindexRet) const
   return pindexBest->nHeight - pindex->nHeight + 1;
 }
 
+//the burn depth is the amount of PoW blocks between (not including) the transaction and the best block
+s32int CMerkleTx::GetBurnDepthInMainChain() const
+{
+  CBlockIndex *pindex = 0;
+  GetDepthInMainChain(pindex);
+
+  if(!pindex)
+    return -1;
+
+  return nPoWBlocksBetween(pindex->nHeight, pindexBest->nHeight);
+}
+
+bool CMerkleTx::IsBurnTxMature() const
+{
+  return GetBurnDepthInMainChain() >= BURN_MIN_CONFIRMS;
+}
 
 int CMerkleTx::GetBlocksToMaturity() const
 {
@@ -1089,7 +1105,7 @@ bool IsInitialBlockDownload()
   if(pindexBest == NULL || nBestHeight < Checkpoints::GetTotalBlocksEstimate())
     return true;
   static int64 nLastUpdate;
-  static CBlockIndex* pindexLastBest;
+  static CBlockIndex *pindexLastBest;
   if(pindexBest != pindexLastBest)
   {
     pindexLastBest = pindexBest;
@@ -1893,10 +1909,11 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
 //
-//Also, desktop's burn TX's are rejected, add a breakpoint in CScript::comparePubKeySignature() and one in 
-//  CBlock::BurnCheckPubKeys()
-//What I think is the issue is that the GetAllTxClassesByIndex fails because I rescrambled the blocks
-//
+//TODO: In HashBurnData(), make the last-burn heights confimations, change that to
+// the number of PoW blocks between burn and last, also, change
+// the nEffBurnCoins decay in CreateNewBlock to only decay on PoW blocks
+// the CMerkleTx::IsBurnTxMature accordingly, and also bitcoinRPC.cpp getBurnBalances()
+// and the db.cpp loading cannot use pindexBest yet
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2113,11 +2130,6 @@ bool CBlock::AcceptBlock()
     if(!pBurnIndex || hashBurnBlock != pBurnIndex->GetBlockHash())
       return DoS(10, error("AcceptBlock() : hashBurnBlock does not equal the pBurnIndex's block hash"));
 
-    // The effective burn coins have to match, regardless of what block type it is
-    int64 calcEffCoins = 0;
-    if(!CheckBurnEffectiveCoins(&calcEffCoins))
-      return DoS(50, error("AcceptBlock() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d, nEffectiveBurnCoins, calcEffCoins));
-
     // Check proof-of-burn hash matches claimed amount
     if(!CheckProofOfBurn(GetBurnHash(), nBurnBits))
       return DoS(100, error("AcceptBlock() : proof-of-burn failed"));
@@ -2125,6 +2137,12 @@ bool CBlock::AcceptBlock()
     if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
       return DoS(100, error("AcceptBlock() : Public signatures do not match with burn transactions's"));
   }
+
+  // The effective burn coins have to match, regardless of what block type it is
+  int64 calcEffCoins = 0;
+  if(!CheckBurnEffectiveCoins(&calcEffCoins))
+    return DoS(50, error("AcceptBlock() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d,
+                         nEffectiveBurnCoins, calcEffCoins));
 
   CBlockIndex* pindexPrev = (*mi).second;
   int nHeight = pindexPrev->nHeight + 1;
@@ -2424,7 +2442,14 @@ bool CBlock::CheckBurnEffectiveCoins(int64 *calcEffCoinsRet) const
       nBurnedCoins += tx.vout[burnOutTxIndex].nValue;
   }
 
-  int64 calcEffCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
+  int64 calcEffCoins;
+
+  //only apply the decay when the current block is a PoW block
+  if(IsProofOfWork())
+    calcEffCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
+  else
+    calcEffCoins = pindexPrev->nEffectiveBurnCoins + nBurnedCoins;
+
   if(calcEffCoinsRet)
     *calcEffCoinsRet = calcEffCoins;
 
@@ -3983,6 +4008,26 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 //////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
+//Returns the number of proof of work blocks between (not including) the
+// blocks with heights startHeight and endHeight
+s32int nPoWBlocksBetween(s32int startHeight, s32int endHeight)
+{
+  if(startHeight >= endHeight)
+    return -1;
+
+  s32int between = 0;
+  CBlockIndex *pindex = pindexByHeight(endHeight);
+  
+  //Go backwards and count the number of proof of work indexes
+  for(; pindex && pindex->pprev->nHeight > startHeight; pindex = pindex->pprev)
+  {
+    if(pindex->IsProofOfWork())
+      between++;
+  }
+
+  return between;
+}
+
 //Calculates the has with the given input data
 // burnBlockHash is the hash of the block holding the burn transaction
 // hashPrevBlock is the hash of the previous block of the block the hash is being calculated on
@@ -4002,15 +4047,16 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
     return error("HashBurnData() : Block hash %s not found in mapBlockIndex", hashPrevBlock.ToString().c_str());
 
   const s32int lastBlkHeight = mapBlockIndex[hashPrevBlock]->nHeight;
+  const s32int between = nPoWBlocksBetween(burnBlkHeight, lastBlkHeight);
 
-  if(lastBlkHeight - burnBlkHeight < BURN_MIN_CONFIRMS)
+  if(between < BURN_MIN_CONFIRMS)
     return error("HashBurnData() : Burn transaction does not meet minimum number of confirmations %d < %d", 
-                 lastBlkHeight - burnBlkHeight, BURN_MIN_CONFIRMS);
+                 between, BURN_MIN_CONFIRMS);
 
   //calculate the multiplier for the hash, the pow() represents the decay
-  // subtracts BURN_MIN_CONFIRMS since the first block the coinst get active should have 100% power
+  // subtracts BURN_MIN_CONFIRMS since the first block the coins get active should have 100% power
   const double multiplier = (BURN_CONSTANT / burnValue) * 
-    pow(2, (lastBlkHeight - burnBlkHeight - BURN_MIN_CONFIRMS) / BURN_HASH_DOUBLE);
+    pow(2, (between - BURN_MIN_CONFIRMS) / BURN_HASH_DOUBLE);
 
   //Calculate the burn hash
   {
@@ -4026,7 +4072,7 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
     //apply the multiplier
     bnTest = bnHash * multiplier;
 
-    //if bignum test is too big to fir in a uint256, continue
+    //if bignum test is too big to fit in a uint256, continue
     if(bnTest > bnMax)
       return false;
 
@@ -4095,25 +4141,31 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
 bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
 {
   /*slimcoin: a hash is calculated by:
-   * hash = (c / b) * 2 ** ((last_BlkNHeight - burned_BlkNHeight) / E) * [Hash]
+   * hash = (c / b) * 2 ** ((nPoWBlocks - M) / E) * [Hash]
    *
    * Where: c = BURN_CONSTANT
    *        b = amount of coins burned
-   *        last_BlkNHeight = the height of the last block in the chain
-   *        burned_BlkNHeight = the height of the block at the time of the burning
+   *        nPoWBlocks = the number of proof of work blocks between (not including)
+   *                     the blocks with heights last_BlkNHeight and burned_BlkNHeight
+   *                         where
+   *                             last_BlkNHeight = the height of the last block in the chain
+   *                             burned_BlkNHeight = the height of the block at the time of the burning
+   *        M = BURN_MIN_CONFIRMS, the required amount of proof of work blocks between (not including)
+   *                                   the block at the time of burning and the last block in the chain
+   *                                   The offset by M allows for the first burn block the burnt coins
+   *                                   can hash to be at 100% strength and decay from there, instead of having
+   *                                   the coins slightly decayed from the beginning
    *        E = BURN_HASH_DOUBLE, an exponential constant which causes 
    *                                   burnt coins to produce slightly larger hashes as time passes
    *
-   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestBlock ++ bestNHeight ++ nonce)
+   *        [Hash] = Hash(burntBlockHash ++ burnWTx.GetHash() ++ hashBestBlock)
    *        Where: burntBlockHash = the hash of the block the transaction is found ing
    *               burnTx.GetHash() = the hash of this transaction
-   *               hashBestBlock = the hash of the best non-proof-of-burn block in the chain at the time of hashing
-   *               bestNHeight = the height of the best non-proof-of-burn block in the chain at the time of hashing
-   *               nonce = an integer 'x' where 0 <= x < BURN_HASH_CONSTANT
+   *               hashBestBlock = the hash of the best proof-of-work block in the chain at the time of hashing
    */
 
   //check if the transaction is old enough
-  if(burnWTx.GetDepthInMainChain() <= BURN_MIN_CONFIRMS)
+  if(!burnWTx.IsBurnTxMature())
     return false;
 
   //check if the wallet transaction has a block hash connected to it
@@ -4162,7 +4214,7 @@ void HashAllBurntTx(uint256 &smallestHashRet, CWalletTx &smallestWTxRet)
       continue;
 
     CWalletTx tmpWTx = pwalletMain->mapWallet[*it];
-    if(tmpWTx.GetDepthInMainChain() <= BURN_MIN_CONFIRMS) //transaction has to have at least some confirmations
+    if(!tmpWTx.IsBurnTxMature()) //transaction has to have at least some confirmations
       continue;
 
     uint256 tmpHash;
@@ -4482,8 +4534,13 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
       nBurnedCoins += tx.vout[burnOutTxIndex].nValue;
   }
 
-  //The new blocks nEffectiveBurnCoins is (the last blocks effective burn coisn / BURN_DECAY_RATE) + nBurnCoins
-  pblock->nEffectiveBurnCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
+  //apply the decay only when this block is a proof of work block
+  if(pblock->IsProofOfWork())
+    //The new blocks nEffectiveBurnCoins is (the last blocks effective burn coisn / BURN_DECAY_RATE) + nBurnCoins
+    pblock->nEffectiveBurnCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
+  else
+    pblock->nEffectiveBurnCoins = pindexPrev->nEffectiveBurnCoins + nBurnedCoins;
+
   pblock->nBurnBits = GetNextBurnTargetRequired(pindexPrev);
 
   //Finally, set the block rewards

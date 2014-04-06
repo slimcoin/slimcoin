@@ -49,7 +49,8 @@ void BurnCoinsDialog::setModel(WalletModel *model)
   if(model)
   {
     setBalance(model->getBalance(), model->getStake(), model->getUnconfirmedBalance());
-    connect(model, SIGNAL(balanceChanged(qint64, qint64, qint64)), this, SLOT(setBalance(qint64, qint64, qint64)));
+    connect(model, SIGNAL(balanceChanged(qint64, qint64, qint64, BurnCoinsBalances)),
+            this, SLOT(setBalance(qint64, qint64, qint64)));
   }
 }
 

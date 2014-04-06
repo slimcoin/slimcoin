@@ -119,6 +119,26 @@ OverviewPage::OverviewPage(QWidget *parent) :
   ui->listTransactions->setMinimumHeight(NUM_ITEMS * (DECORATION_SIZE + 2));
   ui->listTransactions->setAttribute(Qt::WA_MacShowFocusRect, false);
 
+  // Net Burnt Coins: <total burnt coins>
+  ui->labelNetBurnCoins->setFont(QFont("Monospace", -1, QFont::Bold));
+  ui->labelNetBurnCoins->setToolTip(tr("The total amount of coins burned"));
+  ui->labelNetBurnCoins->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);
+
+  // Effective Burnt Coins: <active burnt coins>
+  ui->labelEffBurnCoins->setFont(QFont("Monospace", -1, QFont::Bold));
+  ui->labelEffBurnCoins->setToolTip(tr("Burnt coins that are currently active"));
+  ui->labelEffBurnCoins->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);
+
+  // Immature Burnt Coins: <immature burnt coins>
+  ui->labelImmBurnCoins->setFont(QFont("Monospace", -1, QFont::Bold));
+  ui->labelImmBurnCoins->setToolTip(tr("Burnt coins that are immature (not yet active)"));
+  ui->labelImmBurnCoins->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);
+
+  // Immature Burnt Coins: <immature burnt coins>
+  ui->labelDecayBurnCoins->setFont(QFont("Monospace", -1, QFont::Bold));
+  ui->labelDecayBurnCoins->setToolTip(tr("Burnt coins are no longer active"));
+  ui->labelDecayBurnCoins->setTextInteractionFlags(Qt::TextSelectableByMouse|Qt::TextSelectableByKeyboard);
+
   connect(ui->listTransactions, SIGNAL(clicked(QModelIndex)), this, SIGNAL(transactionClicked(QModelIndex)));
 }
 
@@ -127,7 +147,8 @@ OverviewPage::~OverviewPage()
   delete ui;
 }
 
-void OverviewPage::setBalance(qint64 balance, qint64 stake, qint64 unconfirmedBalance)
+void OverviewPage::setBalance(qint64 balance, qint64 stake, qint64 unconfirmedBalance, 
+                              BurnCoinsBalances burnBalances)
 {
   int unit = model->getOptionsModel()->getDisplayUnit();
   currentBalance = balance;
@@ -136,6 +157,17 @@ void OverviewPage::setBalance(qint64 balance, qint64 stake, qint64 unconfirmedBa
   ui->labelBalance->setText(BitcoinUnits::formatWithUnit(unit, balance));
   ui->labelStake->setText(BitcoinUnits::formatWithUnit(unit, stake));
   ui->labelUnconfirmed->setText(BitcoinUnits::formatWithUnit(unit, unconfirmedBalance));
+
+  //burn information
+  currentNetBurnCoins = burnBalances.netBurnCoins;
+  currentEffectiveBurnCoins = burnBalances.nEffectiveBurnCoins;
+  currentImmatureBurnCoins = burnBalances.nImmatureBurnCoins;
+  currentDecayedBurnCoins = burnBalances.nDecayedBurnCoins;
+
+  ui->labelNetBurnCoins->setText(BitcoinUnits::formatWithUnit(unit, burnBalances.netBurnCoins));
+  ui->labelEffBurnCoins->setText(BitcoinUnits::formatWithUnit(unit, burnBalances.nEffectiveBurnCoins));
+  ui->labelImmBurnCoins->setText(BitcoinUnits::formatWithUnit(unit, burnBalances.nImmatureBurnCoins));
+  ui->labelDecayBurnCoins->setText(BitcoinUnits::formatWithUnit(unit, burnBalances.nDecayedBurnCoins));
 }
 
 void OverviewPage::setNumTransactions(int count)
@@ -160,8 +192,10 @@ void OverviewPage::setModel(WalletModel *model)
     ui->listTransactions->setModelColumn(TransactionTableModel::ToAddress);
 
     // Keep up to date with wallet
-    setBalance(model->getBalance(), model->getStake(), model->getUnconfirmedBalance());
-    connect(model, SIGNAL(balanceChanged(qint64, qint64, qint64)), this, SLOT(setBalance(qint64, qint64, qint64)));
+    setBalance(model->getBalance(), model->getStake(), model->getUnconfirmedBalance(), 
+               model->getBurnCoinBalances());
+    connect(model, SIGNAL(balanceChanged(qint64, qint64, qint64, BurnCoinsBalances)),
+            this, SLOT(setBalance(qint64, qint64, qint64, BurnCoinsBalances)));
 
     setNumTransactions(model->getNumTransactions());
     connect(model, SIGNAL(numTransactionsChanged(int)), this, SLOT(setNumTransactions(int)));
@@ -175,7 +209,8 @@ void OverviewPage::displayUnitChanged()
   if(!model || !model->getOptionsModel())
     return;
   if(currentBalance != -1)
-    setBalance(currentBalance, currentStake, currentUnconfirmedBalance);
+    setBalance(currentBalance, currentStake, currentUnconfirmedBalance, 
+               BurnCoinsBalances(currentNetBurnCoins, currentEffectiveBurnCoins, currentImmatureBurnCoins));
 
   txdelegate->unit = model->getOptionsModel()->getDisplayUnit();
   ui->listTransactions->update();

@@ -211,7 +211,7 @@ public:
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
     {
       nDebit += GetDebit(txin);
-      if (!MoneyRange(nDebit))
+      if(!MoneyRange(nDebit))
         throw std::runtime_error("CWallet::GetDebit() : value out of range");
     }
     return nDebit;
@@ -222,7 +222,7 @@ public:
     BOOST_FOREACH(const CTxOut& txout, tx.vout)
     {
       nCredit += GetCredit(txout);
-      if (!MoneyRange(nCredit))
+      if(!MoneyRange(nCredit))
         throw std::runtime_error("CWallet::GetCredit() : value out of range");
     }
     return nCredit;

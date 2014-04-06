@@ -8,6 +8,7 @@
 #include "util.h"
 #include "wallet.h"
 #include "walletdb.h" // for BackupWallet
+#include "bitcoinrpc.h" // getBurnCoinBalances()
 
 #include <QSet>
 
@@ -36,6 +37,14 @@ qint64 WalletModel::getUnconfirmedBalance() const
   return wallet->GetUnconfirmedBalance();
 }
 
+BurnCoinsBalances WalletModel::getBurnCoinBalances() const
+{
+  int64 netBurnCoins, nEffBurnCoins, immatureCoins;
+  ::getBurnCoinBalances(netBurnCoins, nEffBurnCoins, immatureCoins);
+
+  return BurnCoinsBalances(netBurnCoins, nEffBurnCoins, immatureCoins);
+}
+
 int WalletModel::getNumTransactions() const
 {
   int numTransactions = 0;
@@ -53,8 +62,11 @@ void WalletModel::update()
   int newNumTransactions = getNumTransactions();
   EncryptionStatus newEncryptionStatus = getEncryptionStatus();
 
-  if(cachedBalance != newBalance || cachedUnconfirmedBalance != newUnconfirmedBalance)
-    emit balanceChanged(newBalance, getStake(), newUnconfirmedBalance);
+  BurnCoinsBalances newBurnBalances = getBurnCoinBalances();
+
+  if(cachedBalance != newBalance || cachedUnconfirmedBalance != newUnconfirmedBalance ||
+     cachedBurnCoinsBalances != newBurnBalances)
+    emit balanceChanged(newBalance, getStake(), newUnconfirmedBalance, newBurnBalances);
 
   if(cachedNumTransactions != newNumTransactions)
     emit numTransactionsChanged(newNumTransactions);
@@ -65,6 +77,7 @@ void WalletModel::update()
   cachedBalance = newBalance;
   cachedUnconfirmedBalance = newUnconfirmedBalance;
   cachedNumTransactions = newNumTransactions;
+  cachedBurnCoinsBalances = newBurnBalances;
 }
 
 void WalletModel::updateAddressList()

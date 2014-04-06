@@ -1030,13 +1030,10 @@ Value burncoins(const Array &params, bool fHelp)
   return wtx.GetHash().GetHex();
 }
 
-Value getburndata(const Array &params, bool fHelp)
+Array getBurnCoinBalances(int64 &netBurnCoins, int64 &nEffBurnCoins, int64 &immatureCoins)
 {
-  if(fHelp)
-    throw runtime_error("getburndata\n"
-                        "Lists useful proof-of-burn information");
   Array ret;
-  int64 netBurnCoins = 0, nEffBurnCoins = 0, immatureCoins = 0;
+  netBurnCoins = nEffBurnCoins = immatureCoins = 0;
 
   BOOST_FOREACH(const uint256 &hash, pwalletMain->setBurnHashes)
   {
@@ -1046,13 +1043,23 @@ Value getburndata(const Array &params, bool fHelp)
 
     if(outTx.IsNull())
       continue;
-    
+
+    s32int confirms = wtx.GetBurnDepthInMainChain();    
+
     //fill the entry
     entry.push_back(Pair("burned amount", ValueFromAmount(outTx.nValue)));
-    //Since wtx.GetDepthInMainChain() must be > BURN_MIN_CONFIRMS,
-    // the -1 takes account for the fact that if wtx.GetDepthInMainChain() == BURN_MIN_CONFIRMS,
-    // the burnt tx is still immature
-    s32int mature = wtx.GetDepthInMainChain() - BURN_MIN_CONFIRMS - 1;
+    
+    if(confirms >= 0)
+      entry.push_back(Pair("burn confirmations", confirms));
+    else
+    {
+      //do not do any further calculations on this transaction since it is not in the main chain
+      entry.push_back(Pair("WARNING", "burn transaction not in main chain"));
+      continue;
+    }
+
+    //wtx.GetBurnDepthInMainChain() must be >= BURN_MIN_CONFIRMS for the burn transaction to be mature
+    s32int mature = confirms - BURN_MIN_CONFIRMS;
 
     if(mature < 0)
       entry.push_back(Pair("Burnt coins immature, confirmations needed", -1 * mature));
@@ -1070,6 +1077,19 @@ Value getburndata(const Array &params, bool fHelp)
 
     ret.push_back(entry);
   }
+
+  return ret;
+}
+
+Value getburndata(const Array &params, bool fHelp)
+{
+  if(fHelp)
+    throw runtime_error("getburndata\n"
+                        "Lists useful proof-of-burn information");
+
+  int64 netBurnCoins, nEffBurnCoins, immatureCoins;
+ 
+  Array ret = getBurnCoinBalances(netBurnCoins, nEffBurnCoins, immatureCoins);
 
   Object entry;
   entry.push_back(Pair("Net Burnt Coins", ValueFromAmount(netBurnCoins)));

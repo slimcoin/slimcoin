@@ -119,8 +119,8 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
 // do not change this without changing BURN_HASH_DOUBLE
 #define BURN_DECAY_RATE    1.000693388 
 
-#define BURN_HASH_COUNT    1       //the amount of hashes to be done when getting the smallest hash
-#define BURN_MIN_CONFIRMS  6       //a burn tx requires atleast x > 6 confimations, BURN_MIN_CONFIMS must be > 0
+//a burn tx requires atleast x >= 6 confirmations between it and the best block, BURN_MIN_CONFIMS must be > 0
+#define BURN_MIN_CONFIRMS  6       
 #define BURN_HARDER_TARGET 0.5     //make the burn target 0.5 times the intermediate calculated target
 
 //keeps things safe
@@ -192,6 +192,9 @@ const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfSta
 void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake);
 CBlockIndex *pindexByHeight(s32int nHeight);
 
+//Returns the number of proof of work blocks between (not including) the
+// blocks with heights startHeight and endHeight
+s32int nPoWBlocksBetween(s32int startHeight, s32int endHeight);
 
 
 
@@ -917,6 +920,9 @@ CMerkleTx(const CTransaction& txIn) : CTransaction(txIn)
   int GetBlocksToMaturity() const;
   bool AcceptToMemoryPool(CTxDB& txdb, bool fCheckInputs=true);
   bool AcceptToMemoryPool();
+
+  bool IsBurnTxMature() const;
+  s32int GetBurnDepthInMainChain() const;
 };
 
 

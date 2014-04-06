@@ -102,4 +102,11 @@ public:
 
 extern const CRPCTable tableRPC;
 
+//Gets the balance of the total amount of burned coins, the effective amount of burned coins
+// and the immature amount of burned coins and packages every burn transaction into an Array
+//
+//This was made in a separate function for it to be used in the GUI walletmodel.cpp
+json_spirit::Array getBurnCoinBalances(long long &netBurnCoins, long long &nEffBurnCoins, 
+                                       long long &immatureCoins);
+
 #endif

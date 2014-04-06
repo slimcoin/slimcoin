@@ -627,7 +627,7 @@ bool CTxDB::LoadBlockIndex()
     }    // try
     catch(std::exception &e)
     {
-      return error("LoadBlockIndex() : deserialize error");
+      return error("LoadBlockIndex() : deserialize error : %s", e.what());
     }
   }
 
