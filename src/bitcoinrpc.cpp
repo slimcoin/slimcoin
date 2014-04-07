@@ -1062,7 +1062,7 @@ Array getBurnCoinBalances(int64 &netBurnCoins, int64 &nEffBurnCoins, int64 &imma
     s32int mature = confirms - BURN_MIN_CONFIRMS;
 
     if(mature < 0)
-      entry.push_back(Pair("Burnt coins immature, confirmations needed", -1 * mature));
+      entry.push_back(Pair("burnt coins immature, burn confirmations needed", -1 * mature));
 
     WalletTxToJSON(wtx, entry);
 

@@ -1044,12 +1044,15 @@ static u32int GetNextTargetRequired(const CBlockIndex *pindexLast, bool fProofOf
 
 static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
 {
-  //go back (BURN_MIN_CONFIRMS - 1), -1 since the index passed is -1 from the current already
+  //go back BURN_MIN_CONFIRMS PoW blocks
   const CBlockIndex *pindexBack = pindexLast;
 
   s32int i;
-  for(i = 0; i < BURN_MIN_CONFIRMS - 1 && pindexBack; i++)
-    pindexBack = pindexBack->pprev;
+  for(i = 0; i < BURN_MIN_CONFIRMS && pindexBack; i++)
+  {
+    //GetLastBlockIndex with false returns the last proof of work block index
+    pindexBack = GetLastBlockIndex(pindexBack, false);
+  }
 
   if(pindexBack == NULL || !pindexBack->nEffectiveBurnCoins)
     return CBigNum(0).GetCompact();
@@ -1914,6 +1917,8 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 // the nEffBurnCoins decay in CreateNewBlock to only decay on PoW blocks
 // the CMerkleTx::IsBurnTxMature accordingly, and also bitcoinRPC.cpp getBurnBalances()
 // and the db.cpp loading cannot use pindexBest yet
+//
+//GetNextBurnTarget should go back BURN_MIN_CONFIRMS PoW blocks
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2226,7 +2231,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   // Duplicate burn block allowed only when there is an orphan child block
   if(pblock->IsProofOfBurn() && setBurnSeen.count(pblock->GetProofOfBurn()) && 
      !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-    return error("ProcessBlock() : duplicate proof-of-burn (%s, %s) for block %s", 
+    return error("ProcessBlock() : duplicate proof-of-burn\n\t (%s, %s)\n\t for block %s", 
                  pblock->GetProofOfBurn().first.ToString().c_str(), 
                  pblock->GetProofOfBurn().second.ToString().substr(0, 20).c_str(), 
                  hash.ToString().c_str());
@@ -3424,7 +3429,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
     if(ProcessBlock(pfrom, &block))
       mapAlreadyAskedFor.erase(inv);
-    if(block.nDoS) pfrom->Misbehaving(block.nDoS);
+
+    if(block.nDoS)
+      pfrom->Misbehaving(block.nDoS);
   }
 
 
