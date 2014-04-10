@@ -1912,13 +1912,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
 //
-//TODO: In HashBurnData(), make the last-burn heights confimations, change that to
-// the number of PoW blocks between burn and last, also, change
-// the nEffBurnCoins decay in CreateNewBlock to only decay on PoW blocks
-// the CMerkleTx::IsBurnTxMature accordingly, and also bitcoinRPC.cpp getBurnBalances()
-// and the db.cpp loading cannot use pindexBest yet
-//
-//GetNextBurnTarget should go back BURN_MIN_CONFIRMS PoW blocks
+//Check out the hashing algo, I plan on scapping Dcrypt
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
