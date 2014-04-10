@@ -3908,14 +3908,21 @@ static u32int ScanDcryptHash(CBlock *pblock, u32int *nHashesDone, uint256 *phash
 {
   u32int *nNonce = &(pblock->nNonce);
   u32int orig_nNonce = *nNonce;
+
+  //buffers needed for dcrypt_sp()
+  uint8_t mix_hash[DCRYPT_MIX_HASH_LEN];
   uint8_t digest[DCRYPT_DIGEST_LENGTH];
+  vector<u8int> vMixedHash;
+
+  //on average, reserve 100KB of space as a scratch pad
+  vMixedHash.reserve(100 * 1024 * sizeof(u8int));
 
   for(; !fShutdown;)
   {
     //hash the block
     (*nNonce)++;
 
-    *phash = dcrypt(UBEGIN(pblock->nVersion), HASH_PBLOCK_SIZE(pblock), digest);
+    *phash = dcrypt_sp(UBEGIN(pblock->nVersion), HASH_PBLOCK_SIZE(pblock), mix_hash, digest, vMixedHash);
 
     // Return the nonce if the top 8 bits of the hash are all 0s,
     // caller will check if it satisfies the target
