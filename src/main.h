@@ -1096,7 +1096,7 @@ public:
 
   uint256 GetHash() const
   {
-    return Hash(BEGIN(nVersion), END(nNonce));
+    return DcryptHash(BEGIN(nVersion), END(nNonce));
   }
 
   //PoB
