@@ -1912,7 +1912,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
 //
-//Check out the hashing algo, I plan on scapping Dcrypt
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -4141,7 +4140,7 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
 //Scans all of the hashes of this transaction and returns the smallest one
 bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
 {
-  /*slimcoin: a hash is calculated by:
+  /*slimcoin: a burn hash is calculated by:
    * hash = (c / b) * 2 ** ((nPoWBlocks - M) / E) * [Hash]
    *
    * Where: c = BURN_CONSTANT
@@ -4793,7 +4792,6 @@ void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake)
 
         if(test_hash <= hashTarget)
         {
-
           // Found a solution!
           assert(test_hash == pblock->GetHash());
 

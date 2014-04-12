@@ -182,9 +182,13 @@ uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
   uint8_t hashed_nums[SHA256_LEN + 1], *mix_hash;
   uint256 hash;
 
-  static uint8_t hdig[DCRYPT_DIGEST_LENGTH];
+  bool allocDigest = false;
+
   if(!hash_digest)
-    hash_digest = hdig;
+  {
+    hash_digest = (uint8_t*)malloc(DCRYPT_DIGEST_LENGTH);
+    allocDigest = true;
+  }
 
   sha256_to_str(data, data_sz, hashed_nums, hash_digest);
 
@@ -195,6 +199,9 @@ uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
   sha256((const uint8_t*)mix_hash, mix_hash_len, &hash);
 
   free(mix_hash);
+
+  if(allocDigest)
+    free(hash_digest);
 
   //sucess
   return hash;
