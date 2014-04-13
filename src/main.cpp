@@ -1912,6 +1912,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
 //
+//Burn addresses changed when I modified the hashing algorithm or something, work on them, burncoins asserts
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {

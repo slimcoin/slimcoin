@@ -1560,7 +1560,7 @@ string CWallet::SendMoney(CScript scriptPubKey, int64 nValue, CWalletTx& wtxNew,
 
 
 
-string CWallet::SendMoneyToBitcoinAddress(const CBitcoinAddress& address, int64 nValue,
+string CWallet::SendMoneyToBitcoinAddress(const CBitcoinAddress &address, int64 nValue,
                                           CWalletTx& wtxNew, bool fAskFee, bool fBurnTx)
 {
   // Check amount

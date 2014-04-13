@@ -107,7 +107,7 @@ extern int64 nTransactionFee;
 
 //Burn addresses
 const CBitcoinAddress burnOfficialAddress("mmSLiMCoinMainNetworkBurnAddaCsaBL");
-const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddresscVtB16");
+const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 
 #define BURN_CONSTANT      .01 * CENT
 
