@@ -1,7 +1,5 @@
-#include <stdio.h>
 #include <stdlib.h>        //malloc, free, realloc
 #include <math.h>          //pow
-#include <assert.h>        //for assert
 
 #include "uint256.h"
 #include "main.h"
@@ -84,8 +82,14 @@ void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz,
   return;
 }
 
+//if n_str is 1, this is basically a sha256_to_str of hashed_nums, WOW
 uint32_t rehash_pairs(uint8_t *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
 {
+  //ADDED
+  //sha256_to_str(hashed_nums, SHA256_LEN, hashed_nums, hash_digest);
+  //return 0;
+  //ADDED
+  
   uint32_t hashed_nums_len = n_str * SHA256_LEN;
   uint8_t **new_hash;
   new_hash = (uint8_t**)malloc(sizeof(uint8_t*) * n_str);
@@ -100,6 +104,9 @@ uint32_t rehash_pairs(uint8_t *hashed_nums, uint32_t n_str, uint8_t *hash_digest
   }
 
   //split every n_num character in hashed_nums into the separate hashes in new_hash
+  // ie: if n_str == 2, first char of hashed_nums goes into first new_hash
+  //                    second char of hashed_nums goes into second new_hash
+  //                    third char of hashed_nums goes into first new_hash
   for(i = 0; i < hashed_nums_len; i++)
   {
     //reset the counter every n_num interations
@@ -136,7 +143,6 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
 
   //initialize the class for the extend hash
   Extend_Array new_hash;
-
   Extend_Array_init(&new_hash);
 
   //set the first hash length in the temp array to all 0xff
@@ -158,6 +164,7 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
     }
     
     tmp_val = *(hashed_nums + index);
+
     join_to_array(tmp_array, tmp_val); //plop tmp_val at the end of tmp_array
     sha256_to_str(tmp_array, SHA256_LEN + 1, tmp_array, hash_digest);
 
@@ -183,7 +190,6 @@ uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
   uint256 hash;
 
   bool allocDigest = false;
-
   if(!hash_digest)
   {
     hash_digest = (uint8_t*)malloc(DCRYPT_DIGEST_LENGTH);

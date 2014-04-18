@@ -34,7 +34,7 @@ unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
-set<pair<CScript, int64> > setBurnSeen;
+set<pair<CScript, u32int> > setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
@@ -888,7 +888,7 @@ bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions)
   return true;
 }
 
-uint256 static GetOrphanRoot(const CBlock* pblock)
+uint256 static GetOrphanRoot(const CBlock *pblock)
 {
   // Work back to the first block in the orphan chain
   while(mapOrphanBlocks.count(pblock->hashPrevBlock))
@@ -897,7 +897,7 @@ uint256 static GetOrphanRoot(const CBlock* pblock)
 }
 
 // slimcoin: find block wanted by given orphan block
-uint256 WantedByOrphan(const CBlock* pblockOrphan)
+uint256 WantedByOrphan(const CBlock *pblockOrphan)
 {
   // Work back to the first block in the orphan chain
   while(mapOrphanBlocks.count(pblockOrphan->hashPrevBlock))
@@ -1103,10 +1103,12 @@ bool CBlock::CheckProofOfBurn() const
     return false;
 
   //Get prev block index, this may fail durining initial block download,
-  // if the previous block has not been recieved yet
+  // if the previous block has not been received yet
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
   if(mi == mapBlockIndex.end())
     return DoS(1, error("CheckProofOfBurn() : INFO: prev block not found"));
+
+  const CBlockIndex *pindexPrev = mi->second;
 
   CBlockIndex *pBurnIndex = pindexByHeight(burnBlkHeight);
   if(!pBurnIndex)
@@ -1119,7 +1121,7 @@ bool CBlock::CheckProofOfBurn() const
     return DoS(1, error("CheckProofOfBurn() : INFO: prev block cannot be read"));
 
   //the previous block must be a PoW block
-  if(!mi->second->IsProofOfWork())
+  if(!pindexPrev->IsProofOfWork())
     return DoS(100, error("CheckProofOfBurn() : previous block is not a proof-of-work block"));
 
   if(hashBurnBlock != pBurnIndex->GetBlockHash())
@@ -1132,12 +1134,9 @@ bool CBlock::CheckProofOfBurn() const
   if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
     return DoS(100, error("CheckProofOfBurn() : Public signatures do not match with burn transactions's"));
 
-  // The effective burn coins have to match, regardless of what block type it is
-  int64 calcEffCoins = 0;
-  if(!CheckBurnEffectiveCoins(&calcEffCoins))
-    return DoS(50, 
-               error("CheckProofOfBurn() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d,
-                     nEffectiveBurnCoins, calcEffCoins));
+  // The nBurnBits must be checked here as they are part of the DoS detection
+  if(nBurnBits != GetNextBurnTargetRequired(pindexPrev))
+    return DoS(100, error("CheckProofOfBurn() : incorrect proof-of-burn nBurnBits"));
 
   return true;
 }
@@ -2014,9 +2013,9 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   // Add to mapBlockIndex
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
   if(pindexNew->IsProofOfStake())
-    setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
+    setStakeSeen.insert(pindexNew->GetProofOfStake());
   else if(pindexNew->IsProofOfBurn())
-    setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, pindexNew->nEffectiveBurnCoins));
+    setBurnSeen.insert(pindexNew->GetProofOfBurn());
 
   pindexNew->phashBlock = &((*mi).first);
 
@@ -2283,7 +2282,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
     if(!pblock->CheckProofOfBurn())
     {
       //do not error here as we expect this during initial block download
-      // because the previous blocks may not have been recieved yet
+      // because the previous blocks may not have been received yet
       printf("WARNING: ProcessBlock() : check proof-of-burn failed for block %s\n", hash.ToString().c_str());
       return false;
     }
@@ -3446,7 +3445,9 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
       if(nEvicted > 0)
         printf("mapOrphan overflow, removed %u tx\n", nEvicted);
     }
-    if(tx.nDoS) pfrom->Misbehaving(tx.nDoS);
+
+    if(tx.nDoS)
+      pfrom->Misbehaving(tx.nDoS);
   }
 
 

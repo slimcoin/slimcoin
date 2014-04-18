@@ -76,7 +76,7 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
-extern std::set<std::pair<CScript, int64> > setBurnSeen;
+extern std::set<std::pair<CScript, u32int> > setBurnSeen;
 extern uint256 hashGenesisBlock;
 extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
@@ -1009,7 +1009,7 @@ public:
 
   // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
-  uint256 hashBurnBlock;
+  uint256 hashBurnBlock;//in case there was a fork, used to check if the burn coords point to the block intended
   s32int burnBlkHeight; //the height the block containing the burn tx is found
   s32int burnCTx;       //the index in vtx of the burn tx
   s32int burnCTxOut;    //the index in the burn tx's vout to the burnt coins output
@@ -1180,7 +1180,7 @@ public:
       std::make_pair(COutPoint(), (unsigned int)0);
   }
 
-  std::pair<CScript, int64> GetProofOfBurn() const
+  std::pair<CScript, u32int> GetProofOfBurn() const
   {
     if(vtx.size() == 0 || !vtx[0].IsCoinBase() || !IsProofOfBurn())
     {
@@ -1188,7 +1188,7 @@ public:
       scriptNull.clear();
       return std::make_pair(scriptNull, 0);
     }else
-      return std::make_pair(vtx[0].vout[0].scriptPubKey, nEffectiveBurnCoins);
+      return std::make_pair(vtx[0].vout[0].scriptPubKey, nBurnBits);
   }
 
   // slimcoin: get max transaction timestamp
@@ -1643,6 +1643,17 @@ public:
     if (fGeneratedStakeModifier)
       nFlags |= BLOCK_STAKE_MODIFIER;
   }
+
+  std::pair<COutPoint, u32int> GetProofOfStake() const
+  {
+    return std::make_pair(prevoutStake, nStakeTime);
+  }
+
+  std::pair<CScript, u32int> GetProofOfBurn() const
+  {
+    return std::make_pair(burnScriptPubKey, nBurnBits);
+  }
+
 
   std::string ToString() const
   {

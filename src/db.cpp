@@ -616,10 +616,9 @@ bool CTxDB::LoadBlockIndex()
 
         // slimcoin: build setStakeSeen
         if(pindexNew->IsProofOfStake())
-          setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
-        else if(pindexNew->IsProofOfBurn() && //build the setBurnSeen
-                pindexNew->pprev && pindexNew->pprev->phashBlock)
-          setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, pindexNew->nEffectiveBurnCoins));
+          setStakeSeen.insert(pindexNew->GetProofOfStake());
+        else if(pindexNew->IsProofOfBurn()) //build the setBurnSeen
+          setBurnSeen.insert(pindexNew->GetProofOfBurn());
 
       }else
         break; // if shutdown requested or finished loading block index
@@ -633,11 +632,15 @@ bool CTxDB::LoadBlockIndex()
 
   pcursor->close();
 
+  if(fRequestShutdown)
+    return true;
+
   {
     //after all of the indexes are loaded, now check the proof-of-burn blocks
     BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*) &item, mapBlockIndex)
     {
       const CBlockIndex *pTestBlkIndex = item.second;
+
       //if this index is a proof-of-burn, check it
       if(pTestBlkIndex->IsProofOfBurn())
       {
@@ -710,29 +713,16 @@ bool CTxDB::LoadBlockIndex()
   map<pair<unsigned int, unsigned int>, CBlockIndex*> mapBlockPos;
   for(CBlockIndex* pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
   {
-    if(pindex->nHeight < nBestHeight-nCheckDepth)
+    if(pindex->nHeight < nBestHeight - nCheckDepth)
       break;
 
     CBlock block;
     if(!block.ReadFromDisk(pindex))
       return error("LoadBlockIndex() : block.ReadFromDisk failed");
 
-
-    ///////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////
-
-    // THIS IS MY STUFF
-
+    // Debug print
     printf("Block %3d has this many transactions in it: %d, Block Pos %d\n", 
            pindex->nHeight, block.vtx.size(), pindex->nBlockPos);
-
-
-    // THIS IS MY STUFF
-
-    ///////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////
 
     // check level 1: verify block validity
     if(nCheckLevel > 0 && !block.CheckBlock())

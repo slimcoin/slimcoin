@@ -35,7 +35,6 @@ static void digest_to_string(u8int *hash_digest, u8int *string)
   return;
 }
 
-//optional arg hash_digest
 void sha256_to_str(const u8int *data, size_t data_sz, u8int *outputBuffer, u8int *hash_digest)
 {
   SHA256_CTX sha256;
@@ -55,8 +54,8 @@ void sha256_to_str(const u8int *data, size_t data_sz, u8int *outputBuffer, u8int
   return;
 }
 
-//optional arg hash_digest
-//same code from openssl lib, just a bit more specialized
+//optional arg: hash_digest
+// same code from openssl lib, just a bit more specialized
 uint256 sha256(const u8int *data, size_t data_sz, uint256 *hash_digest)
 {
   SHA256_CTX hash;

@@ -123,7 +123,7 @@ static bool SelectBlockFromCandidates(vector<pair<int64, uint256> >& vSortedByTi
 // block. This is to make it difficult for an attacker to gain control of
 // additional bits in the stake modifier, even after generating a chain of
 // blocks.
-bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64& nStakeModifier, bool& fGeneratedStakeModifier)
+bool ComputeNextStakeModifier(const CBlockIndex *pindexPrev, uint64 &nStakeModifier, bool &fGeneratedStakeModifier)
 {
   nStakeModifier = 0;
   fGeneratedStakeModifier = false;
@@ -139,7 +139,8 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64& nStakeModif
     return error("ComputeNextStakeModifier: unable to get last modifier");
   if(fDebug)
   {
-    printf("ComputeNextStakeModifier: prev modifier=0x%016"PRI64x" time=%s\n", nStakeModifier, DateTimeStrFormat(nModifierTime).c_str());
+    printf("ComputeNextStakeModifier: prev modifier=0x%016"PRI64x" time=%s\n", 
+           nStakeModifier, DateTimeStrFormat(nModifierTime).c_str());
   }
   if(nModifierTime / nModifierInterval >= pindexPrev->GetBlockTime() / nModifierInterval)
     return true;
@@ -199,11 +200,13 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64& nStakeModif
       // 'W' indicates selected proof-of-work blocks
       strSelectionMap.replace(item.second->nHeight - nHeightFirstCandidate, 1, item.second->IsProofOfStake()? "S" : "W");
     }
-    printf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", nHeightFirstCandidate, pindexPrev->nHeight, strSelectionMap.c_str());
+    printf("ComputeNextStakeModifier: selection height [%d, %d] map %s\n", 
+           nHeightFirstCandidate, pindexPrev->nHeight, strSelectionMap.c_str());
   }
   if(fDebug)
   {
-    printf("ComputeNextStakeModifier: new modifier=0x%016"PRI64x" time=%s\n", nStakeModifierNew, DateTimeStrFormat(pindexPrev->GetBlockTime()).c_str());
+    printf("ComputeNextStakeModifier: new modifier=0x%016"PRI64x" time=%s\n", 
+           nStakeModifierNew, DateTimeStrFormat(pindexPrev->GetBlockTime()).c_str());
   }
 
   nStakeModifier = nStakeModifierNew;
@@ -213,8 +216,8 @@ bool ComputeNextStakeModifier(const CBlockIndex* pindexPrev, uint64& nStakeModif
 
 // The stake modifier used to hash for a stake kernel is chosen as the stake
 // modifier about a selection interval later than the coin generating the kernel
-static bool GetKernelStakeModifier(uint256 hashBlockFrom, uint64& nStakeModifier, int& nStakeModifierHeight,
-                                   int64& nStakeModifierTime, bool fPrintProofOfStake)
+static bool GetKernelStakeModifier(uint256 hashBlockFrom, uint64 &nStakeModifier, int &nStakeModifierHeight,
+                                   int64 &nStakeModifierTime, bool fPrintProofOfStake)
 {
   nStakeModifier = 0;
   if(!mapBlockIndex.count(hashBlockFrom))
@@ -272,9 +275,9 @@ static bool GetKernelStakeModifier(uint256 hashBlockFrom, uint64& nStakeModifier
 //   quantities so as to generate blocks faster, degrading the system back into
 //   a proof-of-work situation.
 //
-bool CheckStakeKernelHash(unsigned int nBits, const CBlock& blockFrom, unsigned int nTxPrevOffset,
-                          const CTransaction& txPrev, const COutPoint& prevout, unsigned int nTimeTx,
-                          uint256& hashProofOfStake, bool fPrintProofOfStake)
+bool CheckStakeKernelHash(unsigned int nBits, const CBlock &blockFrom, unsigned int nTxPrevOffset,
+                          const CTransaction &txPrev, const COutPoint &prevout, unsigned int nTimeTx,
+                          uint256 &hashProofOfStake, bool fPrintProofOfStake)
 {
   if(nTimeTx < txPrev.nTime)  // Transaction timestamp violation
     return error("CheckStakeKernelHash() : nTime violation");
