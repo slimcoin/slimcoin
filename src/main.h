@@ -76,7 +76,7 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
-extern std::set<std::pair<CScript, uint256> > setBurnSeen;
+extern std::set<std::pair<CScript, int64> > setBurnSeen;
 extern uint256 hashGenesisBlock;
 extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
@@ -180,7 +180,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
 bool CheckProofOfWork(uint256 hash, u32int nBits);
-bool CheckProofOfBurn(uint256 hash, u32int nBurnBits);
+bool CheckProofOfBurnHash(uint256 hash, u32int nBurnBits);
 int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn=false);
 int64 GetProofOfStakeReward(int64 nCoinAge);
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);
@@ -1010,9 +1010,9 @@ public:
   // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
   uint256 hashBurnBlock;
-  s32int burnBlkHeight;
-  s32int burnCTx;
-  s32int burnCTxOut;
+  s32int burnBlkHeight; //the height the block containing the burn tx is found
+  s32int burnCTx;       //the index in vtx of the burn tx
+  s32int burnCTxOut;    //the index in the burn tx's vout to the burnt coins output
   int64 nEffectiveBurnCoins;
   u32int nBurnBits;
 
@@ -1131,6 +1131,8 @@ public:
 
   bool CheckBurnEffectiveCoins(int64 *calcEffCoinsRet = NULL) const;
 
+  bool CheckProofOfBurn() const;
+
   //PoB
 
   int64 GetBlockTime() const
@@ -1178,15 +1180,15 @@ public:
       std::make_pair(COutPoint(), (unsigned int)0);
   }
 
-  std::pair<CScript, uint256> GetProofOfBurn() const
+  std::pair<CScript, int64> GetProofOfBurn() const
   {
     if(vtx.size() == 0 || !vtx[0].IsCoinBase() || !IsProofOfBurn())
     {
       CScript scriptNull;
       scriptNull.clear();
-      return std::make_pair(scriptNull, (uint256)0);
+      return std::make_pair(scriptNull, 0);
     }else
-      return std::make_pair(vtx[0].vout[0].scriptPubKey, hashPrevBlock);
+      return std::make_pair(vtx[0].vout[0].scriptPubKey, nEffectiveBurnCoins);
   }
 
   // slimcoin: get max transaction timestamp

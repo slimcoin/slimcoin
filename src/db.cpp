@@ -619,7 +619,7 @@ bool CTxDB::LoadBlockIndex()
           setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
         else if(pindexNew->IsProofOfBurn() && //build the setBurnSeen
                 pindexNew->pprev && pindexNew->pprev->phashBlock)
-          setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, *pindexNew->pprev->phashBlock));
+          setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, pindexNew->nEffectiveBurnCoins));
 
       }else
         break; // if shutdown requested or finished loading block index
@@ -645,7 +645,7 @@ bool CTxDB::LoadBlockIndex()
         //nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
                     pTestBlkIndex->burnCTxOut, burnHashRet);
-        if(!CheckProofOfBurn(burnHashRet, pTestBlkIndex->nBurnBits))
+        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
       }
     }

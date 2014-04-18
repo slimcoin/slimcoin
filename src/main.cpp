@@ -34,7 +34,7 @@ unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
-set<pair<CScript, uint256> > setBurnSeen;
+set<pair<CScript, int64> > setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
@@ -55,7 +55,7 @@ map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
-set<pair<CScript, uint256> > setBurnSeenOrphan;
+set<pair<CScript, int64> > setBurnSeenOrphan;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -1080,19 +1080,64 @@ bool CheckProofOfWork(uint256 hash, u32int nBits)
   return true;
 }
 
-bool CheckProofOfBurn(uint256 hash, u32int nBurnBits)
+bool CheckProofOfBurnHash(uint256 hash, u32int nBurnBits)
 {
   CBigNum bnTarget;
   bnTarget.SetCompact(nBurnBits);
   
   // Check range
   if(bnTarget <= 0 || bnTarget > bnProofOfBurnLimit)
-    return error("CheckProofOfBurn() : nBurnBits below minimum work");
+    return error("CheckProofOfBurnHash() : nBurnBits below minimum work");
 
   // Check proof of work matches claimed amount
   if(hash > bnTarget.getuint256())
-    return error("CheckProofOfBurn() : hash doesn't match nBurnBits\n\t%s > %s", 
+    return error("CheckProofOfBurnHash() : hash doesn't match nBurnBits\n\t%s > %s", 
                  hash.ToString().c_str(), bnTarget.getuint256().ToString().c_str());
+
+  return true;
+}
+
+bool CBlock::CheckProofOfBurn() const
+{
+  if(!IsProofOfBurn())
+    return false;
+
+  //Get prev block index, this may fail durining initial block download,
+  // if the previous block has not been recieved yet
+  map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
+  if(mi == mapBlockIndex.end())
+    return DoS(1, error("CheckProofOfBurn() : INFO: prev block not found"));
+
+  CBlockIndex *pBurnIndex = pindexByHeight(burnBlkHeight);
+  if(!pBurnIndex)
+    return DoS(1, error("CheckProofOfBurn() : INFO: burn block not found"));
+
+  //failure to read a burn block may occur durring the initial block download
+  CBlock burnBlock;
+  //Read the block
+  if(!burnBlock.ReadFromDisk(pBurnIndex))
+    return DoS(1, error("CheckProofOfBurn() : INFO: prev block cannot be read"));
+
+  //the previous block must be a PoW block
+  if(!mi->second->IsProofOfWork())
+    return DoS(100, error("CheckProofOfBurn() : previous block is not a proof-of-work block"));
+
+  if(hashBurnBlock != pBurnIndex->GetBlockHash())
+    return DoS(10, error("CheckProofOfBurn() : hashBurnBlock does not equal the pBurnIndex's block hash"));
+
+  // Check proof-of-burn hash matches claimed amount
+  if(!CheckProofOfBurnHash(GetBurnHash(), nBurnBits))
+    return DoS(100, error("CheckProofOfBurn() : proof-of-burn failed"));
+
+  if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
+    return DoS(100, error("CheckProofOfBurn() : Public signatures do not match with burn transactions's"));
+
+  // The effective burn coins have to match, regardless of what block type it is
+  int64 calcEffCoins = 0;
+  if(!CheckBurnEffectiveCoins(&calcEffCoins))
+    return DoS(50, 
+               error("CheckProofOfBurn() : Effective burn coins calculation failed: blk %"PRI64d" != calc %"PRI64d,
+                     nEffectiveBurnCoins, calcEffCoins));
 
   return true;
 }
@@ -1912,7 +1957,10 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
 //
-//Burn addresses changed when I modified the hashing algorithm or something, work on them, burncoins asserts
+//Burn addresses on realnet
+//
+//Good burn hash double time would be 350000 blocks, that is equivalent to a 80% decay in 2 years
+//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -1968,7 +2016,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   if(pindexNew->IsProofOfStake())
     setStakeSeen.insert(make_pair(pindexNew->prevoutStake, pindexNew->nStakeTime));
   else if(pindexNew->IsProofOfBurn())
-    setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, *pindexNew->pprev->phashBlock));
+    setBurnSeen.insert(make_pair(pindexNew->burnScriptPubKey, pindexNew->nEffectiveBurnCoins));
 
   pindexNew->phashBlock = &((*mi).first);
 
@@ -2118,25 +2166,6 @@ bool CBlock::AcceptBlock()
   if(mi == mapBlockIndex.end())
     return DoS(10, error("AcceptBlock() : prev block not found"));
 
-  //Test PoB data before accepting
-  if(IsProofOfBurn())
-  {
-    //the previous block must be a PoW block
-    if(!mapBlockIndex[hashPrevBlock]->IsProofOfWork())
-      return DoS(100, error("AcceptBlock() : previous block is not a proof-of-work block"));
-
-    CBlockIndex *pBurnIndex = pindexByHeight(burnBlkHeight);
-    if(!pBurnIndex || hashBurnBlock != pBurnIndex->GetBlockHash())
-      return DoS(10, error("AcceptBlock() : hashBurnBlock does not equal the pBurnIndex's block hash"));
-
-    // Check proof-of-burn hash matches claimed amount
-    if(!CheckProofOfBurn(GetBurnHash(), nBurnBits))
-      return DoS(100, error("AcceptBlock() : proof-of-burn failed"));
-
-    if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
-      return DoS(100, error("AcceptBlock() : Public signatures do not match with burn transactions's"));
-  }
-
   // The effective burn coins have to match, regardless of what block type it is
   int64 calcEffCoins = 0;
   if(!CheckBurnEffectiveCoins(&calcEffCoins))
@@ -2225,9 +2254,9 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   // Duplicate burn block allowed only when there is an orphan child block
   if(pblock->IsProofOfBurn() && setBurnSeen.count(pblock->GetProofOfBurn()) && 
      !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-    return error("ProcessBlock() : duplicate proof-of-burn\n\t (%s, %s)\n\t for block %s", 
+    return error("ProcessBlock() : duplicate proof-of-burn\n\t (%s, %"PRI64d")\n\t for block %s", 
                  pblock->GetProofOfBurn().first.ToString().c_str(), 
-                 pblock->GetProofOfBurn().second.ToString().substr(0, 20).c_str(), 
+                 pblock->GetProofOfBurn().second, 
                  hash.ToString().c_str());
 
   // Preliminary checks
@@ -2246,6 +2275,18 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 
     if(!mapProofOfStake.count(hash)) // add to mapProofOfStake
       mapProofOfStake.insert(make_pair(hash, hashProofOfStake));
+  }
+
+  // Verify the burn hash, matching signatures between block and burn tx, and effective coins
+  if(pblock->IsProofOfBurn())
+  {
+    if(!pblock->CheckProofOfBurn())
+    {
+      //do not error here as we expect this during initial block download
+      // because the previous blocks may not have been recieved yet
+      printf("WARNING: ProcessBlock() : check proof-of-burn failed for block %s\n", hash.ToString().c_str());
+      return false;
+    }
   }
 
   CBlockIndex *pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
@@ -2305,9 +2346,9 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
       if(setBurnSeenOrphan.count(pblock2->GetProofOfBurn()) && !mapOrphanBlocksByPrev.count(hash) && 
          !Checkpoints::WantedByPendingSyncCheckpoint(hash))
       {
-        error("ProcessBlock() : duplicate proof-of-burn (%s, %s) for orphan block %s", 
+        error("ProcessBlock() : duplicate proof-of-burn (%s, %"PRI64d") for orphan block %s", 
               pblock2->GetProofOfBurn().first.ToString().c_str(), 
-              pblock2->GetProofOfBurn().second.ToString().substr(0, 20).c_str(), 
+              pblock2->GetProofOfBurn().second, 
               hash.ToString().c_str());
         delete pblock2;
         return false;
