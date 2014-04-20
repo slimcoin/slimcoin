@@ -82,12 +82,12 @@ void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz,
   return;
 }
 
-uint64 mix_hashed_nums(uint8_t *hashed_nums, uint8_t **mixed_hash, uint8_t *hash_digest)
+uint64 mix_hashed_nums(uint8_t *hashed_nums, const uint8_t *unhashedData, size_t unhashed_sz,
+                       uint8_t **mixed_hash, uint8_t *hash_digest)
 {
   uint32_t i, index = 0;
   const uint32_t hashed_nums_len = SHA256_LEN;
 
-  uint8_t hashed_end = false;
   uint64 count;
   uint8_t tmp_val, tmp_array[SHA256_LEN + 2];
 
@@ -100,7 +100,7 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint8_t **mixed_hash, uint8_t *hash
   //set the last two bytes to \000
   *(tmp_array + SHA256_LEN) = *(tmp_array + SHA256_LEN + 1) = 0;
 
-  for(count = 0; hashed_end == false; count++)
+  for(count = 0;; count++)
   {
     //+1 to keeps a 0 value of *(hashed_nums + index) moving on
     i = hex_char_to_int(*(hashed_nums + index)) + 1;
@@ -118,20 +118,28 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint8_t **mixed_hash, uint8_t *hash
     join_to_array(tmp_array, tmp_val); //plop tmp_val at the end of tmp_array
     sha256_to_str(tmp_array, SHA256_LEN + 1, tmp_array, hash_digest);
 
+    //extend the expanded hash to the array
+    extend_array(&new_hash, count * SHA256_LEN, tmp_array, SHA256_LEN, false);
+
     //check if the last value of hashed_nums is the same as the last value in tmp_array
     if(index == hashed_nums_len - 1)
       if(tmp_val == *(tmp_array + SHA256_LEN - 1))
-        hashed_end = true;
-
-    //extend the expanded hash to the array
-    extend_array(&new_hash, count * SHA256_LEN, tmp_array, SHA256_LEN, hashed_end);
+      {
+        //add to count since we extended the array, but break will exit the for loop and count
+        // will not get incremenented by the for loop
+        count++;
+        break;
+      }
 
   }
+
+  //extend the unhashed data to the end and add the \000 to the end
+  extend_array(&new_hash, count * SHA256_LEN, (u8int*)unhashedData, unhashed_sz, true);
 
   //assign the address of new_hash's array to mixed_hash
   *mixed_hash = new_hash.array;
 
-  return count * SHA256_LEN;
+  return count * SHA256_LEN + unhashed_sz;
 }
 
 uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
@@ -149,7 +157,7 @@ uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
   sha256_to_str(data, data_sz, hashed_nums, hash_digest);
 
   //mix the hashes up, magority of the time takes here
-  uint64 mix_hash_len = mix_hashed_nums(hashed_nums, &mix_hash, hash_digest);
+  uint64 mix_hash_len = mix_hashed_nums(hashed_nums, data, data_sz, &mix_hash, hash_digest);
 
   //apply the final hash to the output
   sha256((const uint8_t*)mix_hash, mix_hash_len, &hash);
