@@ -5,8 +5,8 @@
 #include "main.h"
 #include "dcrypt.h"
 
-//the base size for realloc will be 1MB
-#define REALLOC_BASE_SZ   (1024 * 1024)
+//the base size for malloc/realloc will be 1KB
+#define REALLOC_BASE_SZ   (1024)
 
 typedef struct
 {
@@ -82,62 +82,12 @@ void extend_array(Extend_Array *extend_array, unsigned long long used_array_sz,
   return;
 }
 
-//if n_str is 1, this is basically a sha256_to_str of hashed_nums, WOW
-uint32_t rehash_pairs(uint8_t *hashed_nums, uint32_t n_str, uint8_t *hash_digest)
+uint64 mix_hashed_nums(uint8_t *hashed_nums, uint8_t **mixed_hash, uint8_t *hash_digest)
 {
-  //ADDED
-  //sha256_to_str(hashed_nums, SHA256_LEN, hashed_nums, hash_digest);
-  //return 0;
-  //ADDED
-  
-  uint32_t hashed_nums_len = n_str * SHA256_LEN;
-  uint8_t **new_hash;
-  new_hash = (uint8_t**)malloc(sizeof(uint8_t*) * n_str);
+  uint32_t i, index = 0;
+  const uint32_t hashed_nums_len = SHA256_LEN;
 
-  uint32_t i, h = 0, j = 0;
-
-  //allocate for the hashes in new_hash
-  for(i = 0; i < n_str; i++)
-  {
-    *(new_hash + i) = (uint8_t*)malloc(SHA256_LEN + 1);
-    *(*(new_hash + i) + SHA256_LEN) = 0; //set the termanating \000
-  }
-
-  //split every n_num character in hashed_nums into the separate hashes in new_hash
-  // ie: if n_str == 2, first char of hashed_nums goes into first new_hash
-  //                    second char of hashed_nums goes into second new_hash
-  //                    third char of hashed_nums goes into first new_hash
-  for(i = 0; i < hashed_nums_len; i++)
-  {
-    //reset the counter every n_num interations
-    if(!(i % n_str) && i)
-    {
-      j++;
-      h = 0;
-    }
-
-    *(*(new_hash + h) + j) = *(hashed_nums + i);
-    h++;
-    
-  }
-
-  //do the actuall rehashing
-  for(i = 0; i < n_str; i++)
-  {
-    sha256_to_str(*(new_hash + i), SHA256_LEN, hashed_nums + i * SHA256_LEN, hash_digest);
-    free(*(new_hash + i));
-  }
-
-  free(new_hash);
-
-  //sucess!
-  return 0;
-}
-
-uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_hash, uint8_t *hash_digest)
-{
   uint8_t hashed_end = false;
-  uint32_t i, index = 0, hashed_nums_len = n_str * SHA256_LEN;
   uint64 count;
   uint8_t tmp_val, tmp_array[SHA256_LEN + 2];
 
@@ -160,7 +110,7 @@ uint64 mix_hashed_nums(uint8_t *hashed_nums, uint32_t n_str, uint8_t **mixed_has
     if(index >= hashed_nums_len)
     {
       index = index % hashed_nums_len;
-      rehash_pairs(hashed_nums, n_str, hash_digest);
+      sha256_to_str(hashed_nums, hashed_nums_len, hashed_nums, hash_digest); //rescramble
     }
     
     tmp_val = *(hashed_nums + index);
@@ -199,7 +149,7 @@ uint256 dcrypt(const uint8_t *data, size_t data_sz, uint8_t *hash_digest)
   sha256_to_str(data, data_sz, hashed_nums, hash_digest);
 
   //mix the hashes up, magority of the time takes here
-  uint64 mix_hash_len = mix_hashed_nums(hashed_nums, 1, &mix_hash, hash_digest);
+  uint64 mix_hash_len = mix_hashed_nums(hashed_nums, &mix_hash, hash_digest);
 
   //apply the final hash to the output
   sha256((const uint8_t*)mix_hash, mix_hash_len, &hash);
