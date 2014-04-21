@@ -1,4 +1,5 @@
-Copyright (c) 2012-2013 SLIMCoin Developers
+Copyright (c) 2013-2014 SLIMCoin Developers
+Copyright (c) 2012-2013 PPCoin Developers
 Copyright (c) 2009-2012 Bitcoin Developers
 Distributed under the MIT/X11 software license, see the accompanying file
 license.txt or http://www.opensource.org/licenses/mit-license.php.  This
@@ -12,7 +13,7 @@ Mac OS X bitcoind build instructions
 Laszlo Hanyecz <solar@heliacal.net>
 Douglas Huff <dhuff@jrbobdobbs.org>
 
-Modified for SLIMCoin by Jeff Larkin <jefflarkin@gmail.com>
+Modified for Slimcoin by P4Titan <p4titan@anche.no>
 
 
 See readme-qt.rst for instructions on building SLIMCoin QT, the
@@ -54,6 +55,6 @@ make -f makefile.osx RELEASE=true 64BIT=true
 Run:
   ./slimcoind --help  # for a list of command-line options.
 Run
-  ./slimcoind -daemon # to start the bitcoin daemon.
+  ./slimcoind -daemon # to start the slimcoin daemon.
 Run
   ./slimcoind help # When the daemon is running, to get a list of RPC commands

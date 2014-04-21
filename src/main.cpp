@@ -4579,7 +4579,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
 
   //apply the decay only when this block is a proof of work block
   if(pblock->IsProofOfWork())
-    //The new blocks nEffectiveBurnCoins is (the last blocks effective burn coisn / BURN_DECAY_RATE) + nBurnCoins
+    //The new blocks nEffectiveBurnCoins is (the last blocks effective burn coins / BURN_DECAY_RATE) + nBurnCoins
     pblock->nEffectiveBurnCoins = (int64)((pindexPrev->nEffectiveBurnCoins / BURN_DECAY_RATE) + nBurnedCoins);
   else
     pblock->nEffectiveBurnCoins = pindexPrev->nEffectiveBurnCoins + nBurnedCoins;
