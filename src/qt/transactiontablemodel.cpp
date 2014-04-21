@@ -460,11 +460,12 @@ QString TransactionTableModel::formatTxAmount(const TransactionRecord *wtx, bool
 
 QVariant TransactionTableModel::txStatusDecoration(const TransactionRecord *wtx) const
 {
-  if(wtx->type == TransactionRecord::Generated)
+  if(wtx->type == TransactionRecord::Generated || wtx->type == TransactionRecord::BurnMint)
   {
     switch(wtx->status.maturity)
     {
-    case TransactionStatus::Immature: {
+    case TransactionStatus::Immature:
+    {
       int total = wtx->status.depth + wtx->status.matures_in;
       int part = (wtx->status.depth * 4 / total) + 1;
       return QIcon(QString(":/icons/transaction_%1").arg(part));
