@@ -960,7 +960,7 @@ int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn)
 int64 GetProofOfStakeReward(int64 nCoinAge)
 {
   static int64 nRewardCoinYear = CENT;  // creation amount per coin-year
-  int64 nSubsidy = nCoinAge * 33 / (365 * 33 + 8) * nRewardCoinYear;
+  int64 nSubsidy = nCoinAge * nRewardCoinYear * 33 / (365 * 33 + 8);
 
   if(fDebug && GetBoolArg("-printcreation"))
     printf("GetProofOfStakeReward(): create = %s nCoinAge = %"PRI64d"\n", FormatMoney(nSubsidy).c_str(), nCoinAge);
@@ -1105,10 +1105,15 @@ bool CBlock::CheckProofOfBurn() const
   //Get prev block index, this may fail durining initial block download,
   // if the previous block has not been received yet
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
-  if(mi == mapBlockIndex.end())
+  if(mi == mapBlockIndex.end() || !mi->second)
     return DoS(1, error("CheckProofOfBurn() : INFO: prev block not found"));
 
-  const CBlockIndex *pindexPrev = mi->second;
+  CBlockIndex *pindexPrev = mi->second;
+  
+  //test to see if this pindex can be reached through the linked list of block indexes
+  // used internally in pindexByHeight()
+  if(!pindexByHeight(pindexPrev->nHeight))
+    return DoS(1, error("CheckProofOfBurn() : INFO: prev block not in main chain"));
 
   CBlockIndex *pBurnIndex = pindexByHeight(burnBlkHeight);
   if(!pBurnIndex)
@@ -1958,6 +1963,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Burn addresses on realnet
 //
+//Segments upon burn block hash calc with the nPoWBlockBack
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -3984,23 +3990,27 @@ CBlockIndex *pindexByHeight(s32int nHeight)
 
   //Get the block index by burnBlkHeight
   CBlockIndex *pindex = NULL;
+  const CBlockIndex *pTestBlkIndex;
 
   //if pindexBest is not set yet, scan through the entire map
   if(!pindexBest)
   {
     BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*)& item, mapBlockIndex)
     {
-      const CBlockIndex *pTestBlkIndex = item.second;
+      pTestBlkIndex = item.second;
       if(pTestBlkIndex->nHeight == nHeight)
       {
-        pindex = const_cast<CBlockIndex*>(pTestBlkIndex);
+        pindex = (CBlockIndex*)pTestBlkIndex;
         break;
       }
     }
   }else{
-    for(pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
-      if(pindex->nHeight == nHeight)
+    for(pTestBlkIndex = pindexBest; pTestBlkIndex && pTestBlkIndex->pprev; pTestBlkIndex = pTestBlkIndex->pprev)
+      if(pTestBlkIndex->nHeight == nHeight)
+      {
+        pindex = (CBlockIndex*)pTestBlkIndex;
         break;
+      }
   }
 
   return pindex;
@@ -4053,18 +4063,22 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 // blocks with heights startHeight and endHeight
 s32int nPoWBlocksBetween(s32int startHeight, s32int endHeight)
 {
-  if(startHeight >= endHeight)
+  if(startHeight >= endHeight || startHeight < 0 || endHeight < 0)
     return -1;
 
   s32int between = 0;
   CBlockIndex *pindex = pindexByHeight(endHeight);
   
   //Go backwards and count the number of proof of work indexes
-  for(; pindex && pindex->pprev->nHeight > startHeight; pindex = pindex->pprev)
+  for(; pindex && pindex->pprev && pindex->pprev->nHeight > startHeight; pindex = pindex->pprev)
   {
     if(pindex->IsProofOfWork())
       between++;
   }
+
+  //exited the for loop early, bad thing
+  if(!pindex || !pindex->pprev)
+    return 0;
 
   return between;
 }
