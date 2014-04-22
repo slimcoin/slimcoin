@@ -303,6 +303,7 @@ QString TransactionTableModel::formatTxStatus(const TransactionRecord *wtx) cons
     status = tr("Confirmed (%1 confirmations)").arg(wtx->status.depth);
     break;
   }
+
   if(wtx->type == TransactionRecord::Generated || wtx->type == TransactionRecord::StakeMint
      || wtx->type == TransactionRecord::BurnMint)
   {
@@ -321,6 +322,14 @@ QString TransactionTableModel::formatTxStatus(const TransactionRecord *wtx) cons
       status += "\n" + tr("Generated but not accepted");
       break;
     }
+  }
+
+  if(wtx->type == TransactionRecord::Burned)
+  {
+    if(wtx->status.burnIsMature)
+      status += "\n" + tr("Burn transaction is mature (%1 burn confirmations)").arg(wtx->status.burnDepth);
+    else
+      status += "\n" + tr("Burn transaction is immature (%1 of %2 burn confirmations)").arg(wtx->status.burnDepth).arg(TransactionRecord::NumBurnConfirmations);
   }
 
   return status;
@@ -476,9 +485,7 @@ QVariant TransactionTableModel::txStatusDecoration(const TransactionRecord *wtx)
     case TransactionStatus::NotAccepted:
       return QIcon(":/icons/transaction_0");
     }
-  }
-  else
-  {
+  }else{
     switch(wtx->status.status)
     {
     case TransactionStatus::OpenUntilBlock:

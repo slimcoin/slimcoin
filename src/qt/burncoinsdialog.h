@@ -14,6 +14,8 @@ QT_BEGIN_NAMESPACE
 class QUrl;
 QT_END_NAMESPACE
 
+#define BURN_COINS_DIALOG_NAME    "Burn coins"
+
 /** Dialog for burning bitcoins */
 class  BurnCoinsDialog : public QDialog
 {

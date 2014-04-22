@@ -71,6 +71,7 @@ public:
     DuplicateAddress,
     TransactionCreationFailed, // Error returned when wallet is still locked
     TransactionCommitFailed,
+    BadBurningCoins, //if the user sends coins to a burn address from the send coins dialog
     Aborted
   };
 
@@ -109,7 +110,7 @@ public:
   };
 
   // Send coins to a list of recipients
-  SendCoinsReturn sendCoins(const QList<SendCoinsRecipient> &recipients);
+  SendCoinsReturn sendCoins(const QList<SendCoinsRecipient> &recipients, bool fBurnTx);
 
   // Wallet encryption
   bool setWalletEncrypted(bool encrypted, const SecureString &passphrase);

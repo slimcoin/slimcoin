@@ -106,7 +106,7 @@ extern int64 nTransactionFee;
 //////////////////////////////////////////////////////////////////////////////
 
 //Burn addresses
-const CBitcoinAddress burnOfficialAddress("mmSLiMCoinMainNetworkBurnAddaCsaBL");
+const CBitcoinAddress burnOfficialAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 
 #define BURN_CONSTANT      .01 * CENT
@@ -154,10 +154,33 @@ inline void GetBurnAddress(CBitcoinAddress &addressRet)
   return;
 }
 
+//the burn address, when created, the constuctor automatically assigns its value
+class CBurnAddress : public CBitcoinAddress
+{
+public:
+
+  CBurnAddress()
+  {
+    GetBurnAddress(*this);
+  }
+};
+
+//if any == true, then compare address with both testnet and realnet burn addresses
+// else compare only with the address that corresponds to which network the client is connected to
+inline bool IsBurnAddress(const CBitcoinAddress &address, bool any=false)
+{
+  if(any)
+    return address == burnTestnetAddress || address == burnOfficialAddress;
+  else{
+    CBurnAddress burnAddress;
+    return address == burnAddress;
+  }
+    
+}
+
 //////////////////////////////////////////////////////////////////////////////
 /*                              Proof Of Burn                               */
 //////////////////////////////////////////////////////////////////////////////
-
 
 
 class CReserveKey;
@@ -655,8 +678,7 @@ public:
   s32int GetBurnOutTxIndex() const
   {
     //find the burnt transaction
-    CBitcoinAddress burnAddress;
-    GetBurnAddress(burnAddress);
+    CBurnAddress burnAddress;
 
     u32int i;
     for(i = 0; i < vout.size(); i++)

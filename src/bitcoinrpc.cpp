@@ -622,6 +622,10 @@ Value sendtoaddress(const Array& params, bool fHelp)
   if(!address.IsValid())
     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
 
+    //the address should not be a burn address
+    if(IsBurnAddress(address, true))
+      throw JSONRPCError(RPC_INVALID_PARAMETER, string("Sending coins to burn address without using burncoins command"));
+
   // Amount
   int64 nAmount = AmountFromValue(params[1]);
   if(nAmount < MIN_TXOUT_AMOUNT)
@@ -993,8 +997,7 @@ Value burncoins(const Array &params, bool fHelp)
 
   string strAccount = AccountFromValue(params[0]);
   
-  CBitcoinAddress burnAddress;
-  GetBurnAddress(burnAddress);
+  CBurnAddress burnAddress;
 
   int64 nAmount = AmountFromValue(params[1]);
 
@@ -1127,6 +1130,10 @@ Value sendfrom(const Array &params, bool fHelp)
   if(!address.IsValid())
     throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid slimcoin address");
 
+    //the address should not be a burn address
+    if(IsBurnAddress(address, true))
+      throw JSONRPCError(RPC_INVALID_PARAMETER, string("Sending coins to burn address without using burncoins command"));
+
   int64 nAmount = AmountFromValue(params[2]);
   if(nAmount < MIN_TXOUT_AMOUNT)
     throw JSONRPCError(RPC_SEND_AMOUNT_TOO_SMALL, "Send amount too small");
@@ -1191,8 +1198,13 @@ Value sendmany(const Array& params, bool fHelp)
   BOOST_FOREACH(const Pair& s, sendTo)
   {
     CBitcoinAddress address(s.name_);
+
     if(!address.IsValid())
       throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid slimcoin address:")+s.name_);
+
+    //the address should not be a burn address
+    if(IsBurnAddress(address, true))
+      throw JSONRPCError(RPC_INVALID_PARAMETER, string("Sending coins to burn address without using burncoins command"));
 
     if(setAddress.count(address))
       throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);

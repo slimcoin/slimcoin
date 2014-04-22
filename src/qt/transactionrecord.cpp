@@ -120,8 +120,9 @@ QList<TransactionRecord> TransactionRecord::decomposeTransaction(const CWallet *
             continue;
           }
 
-          CBitcoinAddress address, burnAddress;
-          GetBurnAddress(burnAddress);
+          CBitcoinAddress address;
+          CBurnAddress burnAddress;
+
           if(ExtractAddress(txout.scriptPubKey, address))
           {
             if(address != burnAddress)
@@ -175,8 +176,19 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
                              (wtx.IsCoinBase() ? 1 : 0),
                              wtx.nTimeReceived,
                              idx);
+
   status.confirmed = wtx.IsConfirmed();
   status.depth = wtx.GetDepthInMainChain();
+
+  //burn transactions need a bit more information
+  if(wtx.IsBurnTx())
+  {
+    //burn transactions mature differently
+    status.burnIsMature = wtx.IsBurnTxMature();
+    //the burn depth can be negative, so get the max from 0 and the burnDepth
+    status.burnDepth = std::max(wtx.GetBurnDepthInMainChain(), 0);
+  }
+
   status.cur_num_blocks = nBestHeight;
 
   if(!wtx.IsFinal())

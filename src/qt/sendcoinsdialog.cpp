@@ -1,4 +1,5 @@
 #include "sendcoinsdialog.h"
+#include "burncoinsdialog.h"
 #include "ui_sendcoinsdialog.h"
 #include "walletmodel.h"
 #include "bitcoinunits.h"
@@ -116,7 +117,8 @@ void SendCoinsDialog::on_sendButton_clicked()
     return;
   }
 
-  WalletModel::SendCoinsReturn sendstatus = model->sendCoins(recipients);
+  //the false indicates this is supposed to not be a burn transaction
+  WalletModel::SendCoinsReturn sendstatus = model->sendCoins(recipients, false);
   switch(sendstatus.status)
   {
   case WalletModel::InvalidAddress:
@@ -153,6 +155,11 @@ void SendCoinsDialog::on_sendButton_clicked()
   case WalletModel::TransactionCommitFailed:
     QMessageBox::warning(this, tr("Send Coins"),
                          tr("Error: The transaction was rejected.  This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here."),
+                         QMessageBox::Ok, QMessageBox::Ok);
+    break;
+  case WalletModel::BadBurningCoins:
+    QMessageBox::warning(this, tr("Send Coins"),
+                         tr("You are sending coins to a burn address without using the dedicated \""BURN_COINS_DIALOG_NAME"\" tab. If you want to burn coins, use the dedicated tab instead of this \""SEND_COINS_DIALOG_NAME"\" tab. \n\nSending coins aborted."),
                          QMessageBox::Ok, QMessageBox::Ok);
     break;
   case WalletModel::Aborted: // User aborted, nothing to do

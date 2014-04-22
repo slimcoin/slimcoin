@@ -1465,7 +1465,7 @@ bool CWallet::CommitTransaction(CWalletTx &wtxNew, CReserveKey &reservekey, bool
   {
     LOCK2(cs_main, cs_wallet);
     
-    //CommitTransaction will not let a burn transaction not pass of fBurnTx is false
+    //CommitTransaction will not let a burn transaction not pass if they do not match
     if(wtxNew.IsBurnTx() != fBurnTx)
       return false;
 

@@ -71,8 +71,7 @@ SendCoinsRecipient BurnCoinsEntry::getValue()
 {
   SendCoinsRecipient rv;
 
-  CBitcoinAddress address;   
-  GetBurnAddress(address);
+  CBurnAddress address;   
 
   rv.address = address.ToString().c_str();
   rv.label = "";

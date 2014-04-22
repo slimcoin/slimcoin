@@ -113,7 +113,7 @@ void BurnCoinsDialog::on_sendButton_clicked()
   }
 
   //sendCoins will automatically detect that this Tx is a burn Tx
-  WalletModel::SendCoinsReturn sendstatus = model->sendCoins(recipients);
+  WalletModel::SendCoinsReturn sendstatus = model->sendCoins(recipients, true);
   switch(sendstatus.status)
   {
   case WalletModel::InvalidAddress:
@@ -151,6 +151,8 @@ void BurnCoinsDialog::on_sendButton_clicked()
     QMessageBox::warning(this, tr("Burn Coins"),
                          tr("Error: The transaction was rejected.  This might happen if some of the coins in your wallet were already spent, such as if you used a copy of wallet.dat and coins were spent in the copy but not marked as spent here."),
                          QMessageBox::Ok, QMessageBox::Ok);
+    break;
+  case WalletModel::BadBurningCoins: // there is no such thing as BadBurningCoins when burning coins
     break;
   case WalletModel::Aborted: // User aborted, nothing to do
     break;

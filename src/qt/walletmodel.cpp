@@ -91,7 +91,7 @@ bool WalletModel::validateAddress(const QString &address)
   return addressParsed.IsValid();
 }
 
-WalletModel::SendCoinsReturn WalletModel::sendCoins(const QList<SendCoinsRecipient> &recipients)
+WalletModel::SendCoinsReturn WalletModel::sendCoins(const QList<SendCoinsRecipient> &recipients, bool fBurnTx)
 {
   qint64 total = 0;
   QSet<QString> setAddress;
@@ -153,7 +153,12 @@ WalletModel::SendCoinsReturn WalletModel::sendCoins(const QList<SendCoinsRecipie
     if(!ThreadSafeAskFee(nFeeRequired, tr("Sending...").toStdString()))
       return Aborted;
 
-    if(!wallet->CommitTransaction(wtx, keyChange, wtx.IsBurnTx()))
+    //if they do not match, that means the user sent coins to a burn address from the send coins dialog
+    if(wtx.IsBurnTx() != fBurnTx)
+      return BadBurningCoins;
+
+    //fBurnTx is to check if this transaction is supposed to be a burn transaction
+    if(!wallet->CommitTransaction(wtx, keyChange, fBurnTx))
       return TransactionCommitFailed;
 
     hex = QString::fromStdString(wtx.GetHash().GetHex());

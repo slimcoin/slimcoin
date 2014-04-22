@@ -1958,8 +1958,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Burn addresses on realnet
 //
-//Good burn hash double time would be 350000 blocks, that is equivalent to a 80% decay in 2 years
-//
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -4158,8 +4156,7 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
 
   //check if burnTxOut's address is a burn address
   // with a bunch of sanity checks
-  CBitcoinAddress burnAddress;
-  GetBurnAddress(burnAddress);
+  CBurnAddress burnAddress;
 
   //check if the out transaction went to a burn address
   CBitcoinAddress address;

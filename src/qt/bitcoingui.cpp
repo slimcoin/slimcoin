@@ -206,13 +206,13 @@ void BitcoinGUI::createActions()
   receiveCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_3));
   tabGroup->addAction(receiveCoinsAction);
 
-  sendCoinsAction = new QAction(QIcon(":/icons/send"), tr("&Send coins"), this);
+  sendCoinsAction = new QAction(QIcon(":/icons/send"), tr("&"SEND_COINS_DIALOG_NAME), this);
   sendCoinsAction->setToolTip(tr("Send coins to a Slimcoin address"));
   sendCoinsAction->setCheckable(true);
   sendCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_2));
   tabGroup->addAction(sendCoinsAction);
 
-  burnCoinsAction = new QAction(QIcon(":/icons/burn"), tr("&Burn coins"), this);
+  burnCoinsAction = new QAction(QIcon(":/icons/burn"), tr("&"BURN_COINS_DIALOG_NAME), this);
   burnCoinsAction->setToolTip(tr("Burn coins from a Slimcoin address"));
   burnCoinsAction->setCheckable(true);
   burnCoinsAction->setShortcut(QKeySequence(Qt::ALT + Qt::Key_6));
