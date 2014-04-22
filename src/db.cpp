@@ -600,12 +600,12 @@ bool CTxDB::LoadBlockIndex()
 
         //Load Proof of Burn switch and indexes
         pindexNew->fProofOfBurn   = diskindex.fProofOfBurn;
+        pindexNew->burnHash       = diskindex.burnHash;
         pindexNew->burnBlkHeight  = diskindex.burnBlkHeight;
         pindexNew->burnCTx        = diskindex.burnCTx;
         pindexNew->burnCTxOut     = diskindex.burnCTxOut;
         pindexNew->nEffectiveBurnCoins = diskindex.nEffectiveBurnCoins;
         pindexNew->nBurnBits      = diskindex.nBurnBits;
-        pindexNew->burnScriptPubKey = diskindex.burnScriptPubKey;
 
         // Watch for genesis block
         if(pindexGenesisBlock == NULL && diskindex.GetBlockHash() == hashGenesisBlock)
@@ -648,7 +648,8 @@ bool CTxDB::LoadBlockIndex()
         //nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
                     pTestBlkIndex->burnCTxOut, burnHashRet);
-        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits))
+        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits) || 
+           pTestBlkIndex->burnHash != burnHashRet)
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
       }
     }

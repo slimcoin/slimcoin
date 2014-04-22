@@ -76,7 +76,7 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
-extern std::set<std::pair<CScript, u32int> > setBurnSeen;
+extern std::set<uint256> setBurnSeen;
 extern uint256 hashGenesisBlock;
 extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
@@ -1032,6 +1032,7 @@ public:
   // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
   uint256 hashBurnBlock;//in case there was a fork, used to check if the burn coords point to the block intended
+  uint256 burnHash;     //used for DoS detection
   s32int burnBlkHeight; //the height the block containing the burn tx is found
   s32int burnCTx;       //the index in vtx of the burn tx
   s32int burnCTxOut;    //the index in the burn tx's vout to the burnt coins output
@@ -1070,6 +1071,7 @@ public:
       //PoB data
       READWRITE(fProofOfBurn);
       READWRITE(hashBurnBlock);
+      READWRITE(burnHash);
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
@@ -1098,9 +1100,10 @@ public:
     nBits = 0;
     nNonce = 0;
 
-    //proof of burn defaults
+    //proof-of-burn defaults
     fProofOfBurn = false;
     hashBurnBlock = 0;
+    burnHash = 0;
     burnBlkHeight = burnCTx = burnCTxOut = -1; //set indexes to negative
     nEffectiveBurnCoins = 0;
     nBurnBits = 0;
@@ -1202,15 +1205,9 @@ public:
       std::make_pair(COutPoint(), (unsigned int)0);
   }
 
-  std::pair<CScript, u32int> GetProofOfBurn() const
+  uint256 GetProofOfBurn() const
   {
-    if(vtx.size() == 0 || !vtx[0].IsCoinBase() || !IsProofOfBurn())
-    {
-      CScript scriptNull;
-      scriptNull.clear();
-      return std::make_pair(scriptNull, 0);
-    }else
-      return std::make_pair(vtx[0].vout[0].scriptPubKey, nBurnBits);
+    return burnHash;
   }
 
   // slimcoin: get max transaction timestamp
@@ -1433,12 +1430,12 @@ public:
 
   // Proof-of-Burn switch, indexes, and values
   bool fProofOfBurn;
+  uint256 burnHash; //the recorded burn hash used for DoS detection
   s32int burnBlkHeight;
   s32int burnCTx;
   s32int burnCTxOut;
   int64 nEffectiveBurnCoins;
   u32int nBurnBits;
-  CScript burnScriptPubKey; //the coinbases' output's scriptPubKey
 
   CBlockIndex()
   {
@@ -1466,12 +1463,12 @@ public:
 
     //PoB
     fProofOfBurn   = false;
+    burnHash       = 0;
     burnBlkHeight  = -1;
     burnCTx        = -1;
     burnCTxOut     = -1;
     nEffectiveBurnCoins = 0;
     nBurnBits      = 0;
-    burnScriptPubKey.clear();
   }
 
   CBlockIndex(unsigned int nFileIn, unsigned int nBlockPosIn, CBlock &block)
@@ -1508,16 +1505,12 @@ public:
 
     //PoB
     fProofOfBurn   = block.fProofOfBurn;
+    burnHash       = block.burnHash;
     burnBlkHeight  = block.burnBlkHeight;
     burnCTx        = block.burnCTx;
     burnCTxOut     = block.burnCTxOut;
     nEffectiveBurnCoins = block.nEffectiveBurnCoins;
     nBurnBits      = block.nBurnBits;
-
-    if(block.IsProofOfBurn())
-      burnScriptPubKey = block.GetProofOfBurn().first;
-    else
-      burnScriptPubKey.clear();
 
   }
 
@@ -1570,9 +1563,7 @@ public:
 
     if(IsProofOfWork())
       return CheckProofOfWork(GetBlockHash(), nBits);
-    else if(IsProofOfBurn()) 
-      return !burnScriptPubKey.empty();
-    else if(IsProofOfStake())
+    else if(IsProofOfBurn() || IsProofOfStake()) 
       return true;
     else
       return false;
@@ -1671,9 +1662,9 @@ public:
     return std::make_pair(prevoutStake, nStakeTime);
   }
 
-  std::pair<CScript, u32int> GetProofOfBurn() const
+  uint256 GetProofOfBurn() const
   {
-    return std::make_pair(burnScriptPubKey, nBurnBits);
+    return burnHash;
   }
 
 
@@ -1754,12 +1745,12 @@ public:
 
       // PoB
       READWRITE(fProofOfBurn);
+      READWRITE(burnHash);
       READWRITE(burnBlkHeight);
       READWRITE(burnCTx);
       READWRITE(burnCTxOut);
       READWRITE(nEffectiveBurnCoins);
       READWRITE(nBurnBits);
-      READWRITE(burnScriptPubKey);
       )
 
     uint256 GetBlockHash() const

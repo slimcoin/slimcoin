@@ -34,7 +34,7 @@ unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
-set<pair<CScript, u32int> > setBurnSeen;
+set<uint256> setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
@@ -55,7 +55,7 @@ map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
-set<pair<CScript, int64> > setBurnSeenOrphan;
+set<uint256> setBurnSeenOrphan;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -1133,15 +1133,17 @@ bool CBlock::CheckProofOfBurn() const
     return DoS(10, error("CheckProofOfBurn() : hashBurnBlock does not equal the pBurnIndex's block hash"));
 
   // Check proof-of-burn hash matches claimed amount
-  if(!CheckProofOfBurnHash(GetBurnHash(), nBurnBits))
+  uint256 calculatedBurnHash = GetBurnHash();
+  if(!CheckProofOfBurnHash(calculatedBurnHash, nBurnBits))
     return DoS(100, error("CheckProofOfBurn() : proof-of-burn failed"));
+
+  //the burn hash recorded in the block must equal the calculated burn hash
+  // this is used in DoS detection
+  if(burnHash != calculatedBurnHash)
+    return DoS(100, error("CheckProofOfBurn() : proof-of-burn hashes do not match"));
 
   if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
     return DoS(100, error("CheckProofOfBurn() : Public signatures do not match with burn transactions's"));
-
-  // The nBurnBits must be checked here as they are part of the DoS detection
-  if(nBurnBits != GetNextBurnTargetRequired(pindexPrev))
-    return DoS(100, error("CheckProofOfBurn() : incorrect proof-of-burn nBurnBits"));
 
   return true;
 }
@@ -2257,9 +2259,8 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   // Duplicate burn block allowed only when there is an orphan child block
   if(pblock->IsProofOfBurn() && setBurnSeen.count(pblock->GetProofOfBurn()) && 
      !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-    return error("ProcessBlock() : duplicate proof-of-burn\n\t (%s, %"PRI64d")\n\t for block %s", 
-                 pblock->GetProofOfBurn().first.ToString().c_str(), 
-                 pblock->GetProofOfBurn().second, 
+    return error("ProcessBlock() : duplicate proof-of-burn\n\t (%s)\n\t for block %s", 
+                 pblock->GetProofOfBurn().ToString().c_str(), 
                  hash.ToString().c_str());
 
   // Preliminary checks
@@ -2349,9 +2350,8 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
       if(setBurnSeenOrphan.count(pblock2->GetProofOfBurn()) && !mapOrphanBlocksByPrev.count(hash) && 
          !Checkpoints::WantedByPendingSyncCheckpoint(hash))
       {
-        error("ProcessBlock() : duplicate proof-of-burn (%s, %"PRI64d") for orphan block %s", 
-              pblock2->GetProofOfBurn().first.ToString().c_str(), 
-              pblock2->GetProofOfBurn().second, 
+        error("ProcessBlock() : duplicate proof-of-burn (%s) for orphan block %s", 
+              pblock2->GetProofOfBurn().ToString().c_str(), 
               hash.ToString().c_str());
         delete pblock2;
         return false;
@@ -5013,6 +5013,9 @@ void SlimCoinAfterBurner(CWallet *pwallet)
           strMintWarning = strMintMessage;
           continue;
         }
+
+        //the burn hash needs to be recorded
+        pblock->burnHash = smallestHash;
 
         strMintWarning = "";
         printf("CPUMiner : proof-of-burn block found %s\n", pblock->GetHash().ToString().c_str()); 
