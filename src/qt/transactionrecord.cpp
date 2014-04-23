@@ -185,8 +185,7 @@ void TransactionRecord::updateStatus(const CWalletTx &wtx)
   {
     //burn transactions mature differently
     status.burnIsMature = wtx.IsBurnTxMature();
-    //the burn depth can be negative, so get the max from 0 and the burnDepth
-    status.burnDepth = std::max(wtx.GetBurnDepthInMainChain(), 0);
+    status.burnDepth = wtx.GetBurnDepthInMainChain();
   }
 
   status.cur_num_blocks = nBestHeight;

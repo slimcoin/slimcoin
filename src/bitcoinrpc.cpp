@@ -1,6 +1,7 @@
 // Copyright (c) 2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
-// Copyright (c) 2011-2013 The SLIMCoin developers
+// Copyright (c) 2011-2013 The Peercoin developers
+// Copyright (c) 2013-2014 The Slimcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1047,22 +1048,14 @@ Array getBurnCoinBalances(int64 &netBurnCoins, int64 &nEffBurnCoins, int64 &imma
     if(outTx.IsNull())
       continue;
 
-    s32int confirms = wtx.GetBurnDepthInMainChain();    
+    s32int burnConfirms = wtx.GetBurnDepthInMainChain();    
 
     //fill the entry
-    entry.push_back(Pair("burned amount", ValueFromAmount(outTx.nValue)));
-    
-    if(confirms >= 0)
-      entry.push_back(Pair("burn confirmations", confirms));
-    else
-    {
-      //do not do any further calculations on this transaction since it is not in the main chain
-      entry.push_back(Pair("WARNING", "burn transaction not in main chain"));
-      continue;
-    }
+    entry.push_back(Pair("burned amount", ValueFromAmount(outTx.nValue)));    
+    entry.push_back(Pair("burn confirmations", burnConfirms));
 
     //wtx.GetBurnDepthInMainChain() must be >= BURN_MIN_CONFIRMS for the burn transaction to be mature
-    s32int mature = confirms - BURN_MIN_CONFIRMS;
+    s32int mature = burnConfirms - BURN_MIN_CONFIRMS;
 
     if(mature < 0)
       entry.push_back(Pair("burnt coins immature, burn confirmations needed", -1 * mature));

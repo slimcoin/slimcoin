@@ -1,6 +1,7 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2012 The Bitcoin developers
-// Copyright (c) 2011-2013 The SLIMCoin developers
+// Copyright (c) 2011-2013 The Peercoin developers
+// Copyright (c) 2013-2014 The Slimcoin Developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -778,7 +779,7 @@ s32int CMerkleTx::GetBurnDepthInMainChain() const
   GetDepthInMainChain(pindex);
 
   if(!pindex)
-    return -1;
+    return 0;
 
   return nPoWBlocksBetween(pindex->nHeight, pindexBest->nHeight);
 }
@@ -1965,7 +1966,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //Burn addresses on realnet
 //
-//Segments upon burn block hash calc with the nPoWBlockBack
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -4064,7 +4064,7 @@ bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth,
 s32int nPoWBlocksBetween(s32int startHeight, s32int endHeight)
 {
   if(startHeight >= endHeight || startHeight < 0 || endHeight < 0)
-    return -1;
+    return 0;
 
   s32int between = 0;
   CBlockIndex *pindex = pindexByHeight(endHeight);

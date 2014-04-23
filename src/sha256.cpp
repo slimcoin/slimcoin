@@ -1,3 +1,8 @@
+// Copyright (c) 2013-2014 The OpenSSL developers
+// Copyright (c) 2013-2014 The Slimcoin developers
+// Distributed under the MIT/X11 software license, see the accompanying
+// file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 #include <string.h>        //for strlen
 
 #include "sha256.h"
