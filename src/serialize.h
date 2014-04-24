@@ -1014,6 +1014,7 @@ CDataStream(const std::vector<unsigned char>& vchIn, int nTypeIn, int nVersionIn
     ::Unserialize(*this, obj, nType, nVersion);
     return (*this);
   }
+  
 };
 
 #ifdef TESTCDATASTREAM

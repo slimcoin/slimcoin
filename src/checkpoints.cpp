@@ -29,18 +29,21 @@ namespace Checkpoints
     ( 0, hashGenesisBlockOfficial )
     ;
 
-  bool CheckHardened(int nHeight, const uint256& hash)
+  bool CheckHardened(int nHeight, const uint256 &hash)
   {
-    if(fTestNet) return true; // Testnet has no checkpoints
+    if(fTestNet) // Testnet has no checkpoints
+      return true;
 
     MapCheckpoints::const_iterator i = mapCheckpoints.find(nHeight);
-    if(i == mapCheckpoints.end()) return true;
+    if(i == mapCheckpoints.end()) 
+      return true;
     return hash == i->second;
   }
 
   int GetTotalBlocksEstimate()
   {
-    if(fTestNet) return 0;
+    if(fTestNet)
+      return 0;
 
     return mapCheckpoints.rbegin()->first;
   }

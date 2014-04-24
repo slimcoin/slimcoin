@@ -398,13 +398,15 @@ bool ParseMoney(const string& str, int64& nRet)
   return ParseMoney(str.c_str(), nRet);
 }
 
-bool ParseMoney(const char* pszIn, int64& nRet)
+bool ParseMoney(const char *pszIn, int64 &nRet)
 {
   string strWhole;
   int64 nUnits = 0;
   const char* p = pszIn;
+
   while(isspace(*p))
     p++;
+
   for(; *p; p++)
   {
     if(*p == '.')
@@ -418,19 +420,26 @@ bool ParseMoney(const char* pszIn, int64& nRet)
       }
       break;
     }
+
     if(isspace(*p))
       break;
+
     if(!isdigit(*p))
       return false;
+
     strWhole.insert(strWhole.end(), *p);
   }
+
   for(; *p; p++)
     if(!isspace(*p))
       return false;
+
   if(strWhole.size() > 10) // guard against 63 bit overflow
     return false;
+
   if(nUnits < 0 || nUnits > COIN)
     return false;
+
   int64 nWhole = atoi64(strWhole);
   int64 nValue = nWhole*COIN + nUnits;
 
@@ -997,7 +1006,8 @@ void ShrinkDebugFile()
     file = fopen(pathLog.string().c_str(), "w");
     if(file)
     {
-      fwrite(pch, 1, nBytes, file);
+      if(fwrite(pch, 1, nBytes, file) != nBytes)
+        error("ShrinkDebugFile() : write to file %s failed", pathLog.string().c_str());
       fclose(file);
     }
   }

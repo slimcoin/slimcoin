@@ -189,7 +189,7 @@ void static ResendWalletTransactions()
 // mapOrphanTransactions
 //
 
-bool AddOrphanTx(const CDataStream& vMsg)
+bool AddOrphanTx(const CDataStream &vMsg)
 {
   CTransaction tx;
   CDataStream(vMsg) >> tx;
@@ -2013,8 +2013,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
   pindexNew->nStakeModifierChecksum = GetStakeModifierChecksum(pindexNew);
 
   if(!CheckStakeModifierCheckpoints(pindexNew->nHeight, pindexNew->nStakeModifierChecksum))
-    return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016"PRI64x, 
-                 pindexNew->nHeight, nStakeModifier);
+    return error("AddToBlockIndex() : Rejected by stake modifier checkpoint height=%d, modifier=0x%016"PRI64x", modifierChecksum 0x%09x", pindexNew->nHeight, nStakeModifier, pindexNew->nStakeModifierChecksum);
 
   // Add to mapBlockIndex
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.insert(make_pair(hash, pindexNew)).first;
@@ -2625,7 +2624,7 @@ bool LoadBlockIndex(bool fAllowNew)
     block.nVersion = 1;
     block.nTime    = !fTestNet ? 1395531800 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 1223176 : 41531;
+    block.nNonce   = !fTestNet ? 448666 : 41531;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
@@ -2635,7 +2634,7 @@ bool LoadBlockIndex(bool fAllowNew)
     if(fTestNet)
       assert(block.hashMerkleRoot == uint256("0xcffb8c273bf7be996fd071abaa442fe2b22c76825dd0980a0fa4f0116bbf9650"));
     else
-      assert(block.hashMerkleRoot == uint256("0xa125edf4bf0e6e311cb56aafafd98b4ee49252f77b955cbb389132cd25da4fdd"));
+      assert(block.hashMerkleRoot == uint256("0x221193f65d0cae4267d35b5e97ae07aeb449098921dd659b220fe765fbe0263f"));
 
     block.print();
 
@@ -2662,7 +2661,6 @@ bool LoadBlockIndex(bool fAllowNew)
         //if scan does not return -1, then check if the hash is less than the target
         if(ScanDcryptHash(&block, &hashes_done, &phash) != (u32int)-1)
         {
-          printf("Hashes Done so far %d\n", hashes_done);
           if(phash < hashTarget)
             break;
         }
@@ -2675,7 +2673,7 @@ bool LoadBlockIndex(bool fAllowNew)
           block.nNonce = 0;
         }
 
-        printf("Looped! nNonce is 0x%x\n", block.nNonce);
+        printf("Looped! nNonce is %#x:%d\n", block.nNonce, block.nNonce);
       }
 
       printf("\n\nHash Target %s\n", hashTarget.ToString().c_str());

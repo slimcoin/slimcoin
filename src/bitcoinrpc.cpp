@@ -516,7 +516,6 @@ Value getaccountaddress(const Array& params, bool fHelp)
   string strAccount = AccountFromValue(params[0]);
 
   Value ret;
-
   ret = GetAccountAddress(strAccount).ToString();
 
   return ret;
@@ -1588,6 +1587,7 @@ Value listtransactions(const Array& params, bool fHelp)
         it != pwalletMain->mapWallet.end(); ++it)
     {
       CWalletTx *wtx = &(it->second);
+
       txByTime.insert(make_pair(wtx->GetTxTime(), TxPair(wtx, (CAccountingEntry*)0)));
     }
   }
@@ -1603,6 +1603,7 @@ Value listtransactions(const Array& params, bool fHelp)
   for(TxItems::reverse_iterator it = txByTime.rbegin(); it != txByTime.rend(); ++it)
   {
     CWalletTx *const pwtx = (*it).second.first;
+
     if(pwtx != 0)
       ListTransactions(*pwtx, strAccount, 0, true, ret);
     CAccountingEntry *const pacentry = (*it).second.second;

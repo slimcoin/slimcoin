@@ -137,7 +137,7 @@ bool CCryptoKeyStore::AddCryptedKey(const std::vector<unsigned char> &vchPubKey,
   return true;
 }
 
-bool CCryptoKeyStore::GetKey(const CBitcoinAddress &address, CKey& keyOut) const
+bool CCryptoKeyStore::GetKey(const CBitcoinAddress &address, CKey &keyOut) const
 {
   {
     LOCK(cs_KeyStore);
