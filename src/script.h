@@ -227,28 +227,24 @@ protected:
   CScript& push_int64(int64 n)
   {
     if (n == -1 || (n >= 1 && n <= 16))
-    {
       push_back(n + (OP_1 - 1));
-    }
-    else
-    {
+    else{
       CBigNum bn(n);
       *this << bn.getvch();
     }
+
     return *this;
   }
 
   CScript& push_uint64(uint64 n)
   {
-    if (n >= 1 && n <= 16)
-    {
+    if(n >= 1 && n <= 16)
       push_back(n + (OP_1 - 1));
-    }
-    else
-    {
+    else{
       CBigNum bn(n);
       *this << bn.getvch();
     }
+
     return *this;
   }
 

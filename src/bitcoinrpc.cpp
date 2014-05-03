@@ -2071,10 +2071,10 @@ Value getwork(const Array& params, bool fHelp)
       "If [data] is specified, tries to solve the block and returns true if it was successful.");
 
   if(vNodes.empty())
-    throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "SLIMCoin is not connected!");
+    throw JSONRPCError(RPC_CLIENT_NOT_CONNECTED, "Slimcoin is not connected!");
 
   if(IsInitialBlockDownload())
-    throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "SLIMCoin is downloading blocks...");
+    throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Slimcoin is downloading blocks...");
 
   typedef map<uint256, pair<CBlock*, CScript> > mapNewBlock_t;
   static mapNewBlock_t mapNewBlock;
@@ -2088,8 +2088,7 @@ Value getwork(const Array& params, bool fHelp)
     static CBlockIndex* pindexPrev;
     static int64 nStart;
     static CBlock* pblock;
-    if(pindexPrev != pindexBest ||
-       (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60))
+    if(pindexPrev != pindexBest || (nTransactionsUpdated != nTransactionsUpdatedLast && GetTime() - nStart > 60))
     {
       if(pindexPrev != pindexBest)
       {
@@ -2099,6 +2098,7 @@ Value getwork(const Array& params, bool fHelp)
           delete pblock;
         vNewBlock.clear();
       }
+
       nTransactionsUpdatedLast = nTransactionsUpdated;
       pindexPrev = pindexBest;
       nStart = GetTime();
@@ -2135,23 +2135,22 @@ Value getwork(const Array& params, bool fHelp)
     result.push_back(Pair("hash1",    HexStr(BEGIN(phash1), END(phash1)))); // deprecated
     result.push_back(Pair("target",   HexStr(BEGIN(hashTarget), END(hashTarget))));
     return result;
-  }
-  else
-  {
+  }else{
     // Parse parameters
     vector<unsigned char> vchData = ParseHex(params[0].get_str());
     if(vchData.size() != 128)
       throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter");
-    CBlock* pdata = (CBlock*)&vchData[0];
+    CBlock *pdata = (CBlock*)&vchData[0];
 
     // Byte reverse
-    for(int i = 0; i < 128/4; i++)
+    for(int i = 0; i < 128 / sizeof(u32int); i++)
       ((unsigned int*)pdata)[i] = ByteReverse(((unsigned int*)pdata)[i]);
 
     // Get saved block
     if(!mapNewBlock.count(pdata->hashMerkleRoot))
       return false;
-    CBlock* pblock = mapNewBlock[pdata->hashMerkleRoot].first;
+
+    CBlock *pblock = mapNewBlock[pdata->hashMerkleRoot].first;
 
     pblock->nTime = pdata->nTime;
     pblock->nNonce = pdata->nNonce;
@@ -2239,9 +2238,7 @@ Value getmemorypool(const Array& params, bool fHelp)
     result.push_back(Pair("bits", HexBits(pblock->nBits)));
 
     return result;
-  }
-  else
-  {
+  }else{
     // Parse parameters
     CDataStream ssBlock(ParseHex(params[0].get_str()), SER_NETWORK, PROTOCOL_VERSION);
     CBlock pblock;

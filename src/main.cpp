@@ -1959,10 +1959,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //MYTODO: 
 //
 //GetProofOfBurnReward() uses GetPoWReward inside
-//
-//If I plan to change the hashing algo, I will also need to change the checkpoints nStakeModifierChecksum
-//
-//Test the added setBurnSeen and setBurnSeenOrphan, they seem to work
+//  possibly make the max block value be 25 coins and in GetPoBReward(), add a 10 * ... scale
 //
 //Burn addresses on realnet
 //
@@ -4639,14 +4636,13 @@ void FormatHashBuffers(CBlock *pblock, char *pmidstate, char *pdata, char *phash
       unsigned int nTime;
       unsigned int nBits;
       unsigned int nNonce;
-    }
-      block;
+    } block;
+
     unsigned char pchPadding0[64];
     uint256 hash1;
     unsigned char pchPadding1[64];
-  }
-  tmp;
-  memset(&tmp, 0, sizeof(tmp));
+  } tmp;
+  memset(&tmp, 0x0, sizeof(tmp));
 
   tmp.block.nVersion       = pblock->nVersion;
   tmp.block.hashPrevBlock  = pblock->hashPrevBlock;
@@ -4667,6 +4663,8 @@ void FormatHashBuffers(CBlock *pblock, char *pmidstate, char *pdata, char *phash
 
   memcpy(pdata, &tmp.block, 128);
   memcpy(phash1, &tmp.hash1, 64);
+
+  return;
 }
 
 
@@ -4678,10 +4676,13 @@ bool CheckWork(CBlock *pblock, CWallet &wallet, CReserveKey &reservekey)
   uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
   uint256 hashBurnTarget = CBigNum().SetCompact(pblock->nBurnBits).getuint256();
 
-  if(hash > hashTarget && pblock->IsProofOfWork())
+  if(pblock->IsProofOfWork() && hash > hashTarget)
+  {
+    printf("WOWOWO No GOOD %s %u\n", hash.ToString().c_str(), pblock->nNonce);
     return error("SlimCoinMiner : proof-of-work not meeting target");
+  }
 
-  if(burnHash > hashBurnTarget && pblock->IsProofOfBurn())
+  if(pblock->IsProofOfBurn() && burnHash > hashBurnTarget)
     return error("SlimCoinMiner : proof-of-burn not meeting target");
 
   //// debug prints

@@ -28,7 +28,7 @@ static unsigned int nMessageStartSwitchTime = 1400000000;
 void GetMessageStart(unsigned char pchMessageStart[], bool fPersistent)
 {
   if(fTestNet)
-    memcpy(pchMessageStart, (fPersistent || GetAdjustedTime() > nMessageStartTestSwitchTime)? pchMessageStartTestNew : pchMessageStartTestOld, sizeof(pchMessageStartTestNew));
+    memcpy(pchMessageStart, (fPersistent || GetAdjustedTime() > nMessageStartTestSwitchTime) ? pchMessageStartTestNew : pchMessageStartTestOld, sizeof(pchMessageStartTestNew));
   else
     memcpy(pchMessageStart, (fPersistent || GetAdjustedTime() > nMessageStartSwitchTime)? pchMessageStartSLIMCoin : pchMessageStartBitcoin, sizeof(pchMessageStartSLIMCoin));
 
