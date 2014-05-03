@@ -38,7 +38,7 @@ set<pair<COutPoint, unsigned int> > setStakeSeen;
 set<uint256> setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
-static CBigNum bnProofOfBurnLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
+static CBigNum bnProofOfBurnLimit(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
 static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007ffff....
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
 int nCoinbaseMaturity = COINBASE_MATURITY_SMC;
@@ -1061,6 +1061,10 @@ static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
   CBigNum bnNew(~uint256(0));
 
   bnNew = (bnNew * (BURN_CONSTANT / pindexBack->nEffectiveBurnCoins)) * BURN_HARDER_TARGET;
+
+  //we can't make it too easy
+  if(bnNew > bnProofOfBurnLimit)
+    bnNew = bnProofOfBurnLimit;
   
   return bnNew.GetCompact();
 }
