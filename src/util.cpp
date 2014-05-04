@@ -484,13 +484,18 @@ vector<unsigned char> ParseHex(const char* psz)
   {
     while(isspace(*psz))
       psz++;
+    
+    //is *psz a valid hex
     signed char c = phexdigit[(unsigned char)*psz++];
     if(c == (signed char)-1)
       break;
+
+    //is *psz a valid hex
     unsigned char n = (c << 4);
     c = phexdigit[(unsigned char)*psz++];
     if(c == (signed char)-1)
       break;
+
     n |= c;
     vch.push_back(n);
   }

@@ -113,7 +113,7 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 
 #define BURN_CONSTANT      .01 * CENT
 
-//The hash of a burnt tx doubles smoothly over the course of 1000.0 blocks, 
+//The hash of a burnt tx doubles smoothly over the course of 350000.0 blocks, 
 // do not change this without changing BURN_DECAY_RATE (keep floating point)
 #define BURN_HASH_DOUBLE   350000.0 
 

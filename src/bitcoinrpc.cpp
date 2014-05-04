@@ -2793,7 +2793,8 @@ bool ClientAllowed(const string& strAddress)
 //
 // IOStream device that speaks SSL but can also speak non-SSL
 //
-class SSLIOStreamDevice : public iostreams::device<iostreams::bidirectional> {
+class SSLIOStreamDevice : public iostreams::device<iostreams::bidirectional>
+{
 public:
   SSLIOStreamDevice(SSLStream &streamIn, bool fUseSSLIn) : stream(streamIn)
   {

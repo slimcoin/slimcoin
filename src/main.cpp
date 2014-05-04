@@ -431,14 +431,14 @@ bool CTransaction::AreInputsStandard(const MapPrevTx& mapInputs) const
   return true;
 }
 
-unsigned int
-CTransaction::GetLegacySigOpCount() const
+unsigned int CTransaction::GetLegacySigOpCount() const
 {
   unsigned int nSigOps = 0;
   BOOST_FOREACH(const CTxIn& txin, vin)
   {
     nSigOps += txin.scriptSig.GetSigOpCount(false);
   }
+
   BOOST_FOREACH(const CTxOut& txout, vout)
   {
     nSigOps += txout.scriptPubKey.GetSigOpCount(false);
@@ -1060,7 +1060,7 @@ static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
 
   CBigNum bnNew(~uint256(0));
 
-  bnNew = (bnNew * (BURN_CONSTANT / pindexBack->nEffectiveBurnCoins)) * BURN_HARDER_TARGET;
+  bnNew = (bnNew * BURN_HARDER_TARGET * BURN_CONSTANT) / pindexBack->nEffectiveBurnCoins;
 
   //we can't make it too easy
   if(bnNew > bnProofOfBurnLimit)
