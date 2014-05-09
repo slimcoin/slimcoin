@@ -543,6 +543,8 @@ bool AppInit2(int argc, char *argv[])
   {
     if(!Checkpoints::SetCheckpointPrivKey(GetArg("-checkpointkey", "")))
       ThreadSafeMessageBox(_("Unable to sign checkpoint, wrong checkpointkey?\n"), _("Slimcoin"), wxOK | wxMODAL);
+    else
+      printf("Signed checkpoint sucessfully, private key accepted\n");
   }
 
   //

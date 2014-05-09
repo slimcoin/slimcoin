@@ -2610,9 +2610,9 @@ bool LoadBlockIndex(bool fAllowNew)
     //   vMerkleTree: 4a5e1e
 
     // Genesis block
-    const char *pszTimestamp = "RT: http://rt.com/news/war-gear-ukraine-riot-084/";
+    const char *pszTimestamp = "RT: 2 southeast Ukranian regions to hold referendum May 11 as planned";
     CTransaction txNew;
-    txNew.nTime = !fTestNet ? 1395531800 : 1390500425;
+    txNew.nTime = !fTestNet ? 1399578460 : 1390500425;
     txNew.vin.resize(1);
     txNew.vout.resize(1);
     txNew.vin[0].scriptSig = CScript() << 486604799 << CBigNum(9999) << vector<unsigned char>((const unsigned char*)pszTimestamp, (const unsigned char*)pszTimestamp + strlen(pszTimestamp));
@@ -2623,9 +2623,9 @@ bool LoadBlockIndex(bool fAllowNew)
     block.hashPrevBlock = 0;
     block.hashMerkleRoot = block.BuildMerkleTree();
     block.nVersion = 1;
-    block.nTime    = !fTestNet ? 1395531800 : 1390500425;
+    block.nTime    = !fTestNet ? 1399578460 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 448666 : 41531;
+    block.nNonce   = !fTestNet ? 116872 : 41531;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
@@ -2635,7 +2635,7 @@ bool LoadBlockIndex(bool fAllowNew)
     if(fTestNet)
       assert(block.hashMerkleRoot == uint256("0xcffb8c273bf7be996fd071abaa442fe2b22c76825dd0980a0fa4f0116bbf9650"));
     else
-      assert(block.hashMerkleRoot == uint256("0x221193f65d0cae4267d35b5e97ae07aeb449098921dd659b220fe765fbe0263f"));
+      assert(block.hashMerkleRoot == uint256("0xbae3867d5e5d35c321adaf9610b9e4147a855f9ad319fdcf70913083d783753f"));
 
     block.print();
 

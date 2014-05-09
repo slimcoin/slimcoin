@@ -437,8 +437,7 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode *pfrom)
   }
 
   if(!Checkpoints::ValidateSyncCheckpoint(hashCheckpoint))
-    return error("ProcessSyncCheckpoint() : Validation of checkpoint failed at %s", 
-                 hashCheckpoint.ToString().c_str());
+    return false;
 
   CTxDB txdb;
   CBlockIndex* pindexCheckpoint = mapBlockIndex[hashCheckpoint];
