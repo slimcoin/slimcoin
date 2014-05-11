@@ -16,7 +16,7 @@
 #include <string>
 #include "uint256.h"
 
-#define SMCOIN_PORT  41682
+#define SLMOIN_PORT  41682
 #define RPC_PORT     41683
 #define TESTNET_PORT 41684
 
@@ -26,7 +26,7 @@ void GetMessageStart(unsigned char pchMessageStart[], bool fPersistent = false);
 
 static inline unsigned short GetDefaultPort(const bool testnet = fTestNet)
 {
-  return testnet ? TESTNET_PORT : SMCOIN_PORT;
+  return testnet ? TESTNET_PORT : SLMOIN_PORT;
 }
 
 

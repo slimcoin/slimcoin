@@ -41,7 +41,7 @@ static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 sin
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
 static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007ffff....
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
-int nCoinbaseMaturity = COINBASE_MATURITY_SMC;
+int nCoinbaseMaturity = COINBASE_MATURITY_SLM;
 CBlockIndex *pindexGenesisBlock = NULL;
 int nBestHeight = -1;
 CBigNum bnBestChainTrust = 0;

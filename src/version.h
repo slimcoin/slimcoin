@@ -24,17 +24,17 @@ static const int CLIENT_VERSION =
                          +       1 * CLIENT_VERSION_BUILD;
 
 // Set to true for release, false for prerelease or test build
-#define CLIENT_VERSION_IS_RELEASE  false
+#define CLIENT_VERSION_IS_RELEASE  true
 
 extern const std::string CLIENT_NAME;
 extern const std::string CLIENT_BUILD;
 extern const std::string CLIENT_DATE;
 
 // slimcoin version - intended for display purpose ONLY
-#define SMCOIN_VERSION_MAJOR       0
-#define SMCOIN_VERSION_MINOR       3
-#define SMCOIN_VERSION_REVISION    0
-#define SMCOIN_VERSION_BUILD       0
+#define SLMCOIN_VERSION_MAJOR       0
+#define SLMCOIN_VERSION_MINOR       3
+#define SLMCOIN_VERSION_REVISION    0
+#define SLMCOIN_VERSION_BUILD       0
 
 //
 // network protocol versioning

@@ -2,8 +2,8 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef SMCOIN_KERNEL_H
-#define SMCOIN_KERNEL_H
+#ifndef SLMOIN_KERNEL_H
+#define SLMOIN_KERNEL_H
 
 #include "main.h"
 #include "wallet.h"
@@ -45,4 +45,4 @@ unsigned int GetStakeModifierChecksum(const CBlockIndex* pindex);
 // Check stake modifier hard checkpoints
 bool CheckStakeModifierCheckpoints(int nHeight, unsigned int nStakeModifierChecksum);
 
-#endif // SMCOIN_KERNEL_H
+#endif // SLMOIN_KERNEL_H

@@ -19,7 +19,7 @@ Modified for Slimcoin by P4Titan <p4titan@anche.no>
 See readme-qt.rst for instructions on building SLIMCoin QT, the
 graphical user interface.
 
-Tested on 10.5 and 10.6 intel.  SMC is not supported because it's big-endian.
+Tested on 10.5 and 10.6 intel.  SLM is not supported because it's big-endian.
 
 All of the commands should be executed in Terminal.app.. it's in
 /Applications/Utilities
