@@ -908,7 +908,8 @@ uint256 WantedByOrphan(const CBlock *pblockOrphan)
 
 int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn)
 {
-  CBigNum bnSubsidyLimit = fProofOfBurn ? MAX_MINT_PROOF_OF_BURN : MAX_MINT_PROOF_OF_WORK;
+  const int64 maxSubsidy = fProofOfBurn ? MAX_MINT_PROOF_OF_BURN : MAX_MINT_PROOF_OF_WORK;
+  CBigNum bnSubsidyLimit = maxSubsidy;
   CBigNum bnTarget;
   bnTarget.SetCompact(nBits); //expand the target hash for the current block
   CBigNum bnTargetLimit = fProofOfBurn ? bnProofOfBurnLimit : bnProofOfWorkLimit;
@@ -952,9 +953,9 @@ int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn)
 
   if(fDebug && GetBoolArg("-printcreation"))
     printf("GetProofOfWorkReward() : create = %s nBits = 0x%08x nSubsidy = %"PRI64d" return = %"PRI64d"\n",
-           FormatMoney(nSubsidy).c_str(), nBits, nSubsidy, min(nSubsidy, MAX_MINT_PROOF_OF_WORK));
+           FormatMoney(nSubsidy).c_str(), nBits, nSubsidy, min(nSubsidy, maxSubsidy));
 
-  return min(nSubsidy, MAX_MINT_PROOF_OF_WORK);
+  return min(nSubsidy, maxSubsidy);
 }
 
 // slimcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
