@@ -8,6 +8,11 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "mruset.h"
+#include "netbase.h"
+#include "protocol.h"
+#include "addrman.h"
+
 #include <deque>
 #include <boost/array.hpp>
 #include <boost/foreach.hpp>
@@ -16,11 +21,6 @@
 #ifndef WIN32
 #include <arpa/inet.h>
 #endif
-
-#include "mruset.h"
-#include "netbase.h"
-#include "protocol.h"
-#include "addrman.h"
 
 class CAddrDB;
 class CRequestTracker;

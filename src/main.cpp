@@ -1060,7 +1060,9 @@ static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
     return CBigNum(0).GetCompact();
 
   CBigNum bnNew(~uint256(0));
-
+  
+  //formula for difficulty where take 0xffffff... and apply multiplier that is the same
+  // as the hash burn data's, excluding the decay factor
   bnNew = (bnNew * BURN_HARDER_TARGET * BURN_CONSTANT) / pindexBack->nEffectiveBurnCoins;
 
   //we can't make it too easy
@@ -1964,9 +1966,11 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //MYTODO: 
 //
 //GetProofOfBurnReward() uses GetPoWReward inside
-//  possibly make the max block value be 25 coins and in GetPoBReward(), add a 10 * ... scale
 //
-//Burn addresses on realnet
+//FIX: multi precision in CBlock::CheckPoB burnHash == calcHash
+// in CBigNum numberator has some deviation factor that in.
+// DB also change PoB deserialization to do CBigNum(num).GetCompact() ==
+// that is fine to be like that, but the check block has to be exact
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)

@@ -225,28 +225,34 @@ namespace Checkpoints
   // Check against synchronized checkpoint
   bool CheckSync(const uint256& hashBlock, const CBlockIndex* pindexPrev)
   {
-    if(fTestNet) return true; // Testnet has no checkpoints
+    if(fTestNet) 
+      return true; // Testnet has no checkpoints
+
     int nHeight = pindexPrev->nHeight + 1;
 
     LOCK(cs_hashSyncCheckpoint);
     // sync-checkpoint should always be accepted block
     assert(mapBlockIndex.count(hashSyncCheckpoint));
-    const CBlockIndex* pindexSync = mapBlockIndex[hashSyncCheckpoint];
+    const CBlockIndex *pindexSync = mapBlockIndex[hashSyncCheckpoint];
 
     if(nHeight > pindexSync->nHeight)
     {
       // trace back to same height as sync-checkpoint
-      const CBlockIndex* pindex = pindexPrev;
+      const CBlockIndex *pindex = pindexPrev;
       while(pindex->nHeight > pindexSync->nHeight)
         if(!(pindex = pindex->pprev))
           return error("CheckSync: pprev null - block index structure failure");
+
       if(pindex->nHeight < pindexSync->nHeight || pindex->GetBlockHash() != hashSyncCheckpoint)
         return false; // only descendant of sync-checkpoint can pass check
     }
+
     if(nHeight == pindexSync->nHeight && hashBlock != hashSyncCheckpoint)
       return false; // same height with sync-checkpoint
+
     if(nHeight < pindexSync->nHeight && !mapBlockIndex.count(hashBlock))
       return false; // lower height than sync-checkpoint
+
     return true;
   }
 

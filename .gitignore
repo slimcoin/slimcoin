@@ -5,6 +5,7 @@ src/test_slimcoin
 src/build.h
 .*.swp
 *.*~*
+*~
 *.bak
 *.rej
 *.orig
