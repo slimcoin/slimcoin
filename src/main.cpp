@@ -1148,7 +1148,7 @@ bool CBlock::CheckProofOfBurn() const
   //the burn hash recorded in the block must equal the calculated burn hash
   // this is used in DoS detection
   if(burnHash != calculatedBurnHash)
-    return DoS(100, error("CheckProofOfBurn() : proof-of-burn hashes do not match"));
+    return DoS(75, error("CheckProofOfBurn() : proof-of-burn hashes do not match"));
 
   if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
     return DoS(100, error("CheckProofOfBurn() : Public signatures do not match with burn transactions's"));

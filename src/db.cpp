@@ -636,29 +636,6 @@ bool CTxDB::LoadBlockIndex()
   if(fRequestShutdown)
     return true;
 
-  {
-    //after all of the indexes are loaded, now check the proof-of-burn blocks
-    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*) &item, mapBlockIndex)
-    {
-      const CBlockIndex *pTestBlkIndex = item.second;
-
-      //if this index is a proof-of-burn, check it
-      if(pTestBlkIndex->IsProofOfBurn())
-      {
-        uint256 burnHashRet;
-        //nHeight - 1 since GetBurnHash wants the index of the previous block
-        GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                    pTestBlkIndex->burnCTxOut, burnHashRet);
-        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits) || 
-           pTestBlkIndex->burnHash != burnHashRet)
-          return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
-      }
-    }
-  }
-
-  if(fRequestShutdown)
-    return true;
-
   // Calculate bnChainTrust
   vector<pair<int, CBlockIndex*> > vSortedByHeight;
   vSortedByHeight.reserve(mapBlockIndex.size());
@@ -708,6 +685,26 @@ bool CTxDB::LoadBlockIndex()
     nCheckDepth = 1000000000; // suffices until the year 19000
   if(nCheckDepth > nBestHeight)
     nCheckDepth = nBestHeight;
+
+  {
+    //after all of the indexes are loaded, now check the proof-of-burn blocks
+    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*) &item, mapBlockIndex)
+    {
+      const CBlockIndex *pTestBlkIndex = item.second;
+
+      //if this index is a proof-of-burn, check it
+      if(pTestBlkIndex->IsProofOfBurn())
+      {
+        uint256 burnHashRet;
+        //nHeight - 1 since GetBurnHash wants the index of the previous block
+        GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
+                    pTestBlkIndex->burnCTxOut, burnHashRet);
+        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits) || 
+           pTestBlkIndex->burnHash != burnHashRet)
+          return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
+      }
+    }
+  }
 
   InitMessage("Verifying blocks...");
   printf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
