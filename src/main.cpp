@@ -2630,7 +2630,7 @@ bool LoadBlockIndex(bool fAllowNew)
     block.nVersion = 1;
     block.nTime    = !fTestNet ? 1399578460 : 1390500425;
     block.nBits    = bnProofOfWorkLimit.GetCompact();
-    block.nNonce   = !fTestNet ? 116872 : 41531;
+    block.nNonce   = !fTestNet ? 116872 : 3098;
 
     // debug print
     printf("block.GetHash() = %s\n", block.GetHash().ToString().c_str());
@@ -2638,7 +2638,7 @@ bool LoadBlockIndex(bool fAllowNew)
     printf("block.hashMerkleRoot = %s\n", block.hashMerkleRoot.ToString().c_str());
 
     if(fTestNet)
-      assert(block.hashMerkleRoot == uint256("0xcffb8c273bf7be996fd071abaa442fe2b22c76825dd0980a0fa4f0116bbf9650"));
+      assert(block.hashMerkleRoot == uint256("0xce86aa96a71e5c74ea535ed5f23d5b1b6ca279ad16cac3cb95e123d80027f014"));
     else
       assert(block.hashMerkleRoot == uint256("0xbae3867d5e5d35c321adaf9610b9e4147a855f9ad319fdcf70913083d783753f"));
 
@@ -4330,9 +4330,11 @@ int64 nLastCoinStakeSearchInterval = 0;
 // CreateNewBlock:
 //   fProofOfStake: try (best effort) to make a proof-of-stake block
 //   burnWalletTx is the walletTx for a burn transaction that when hashed, produces a valid hash <= burn target
-CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *burnWalletTx)
+CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *burnWalletTx, CReserveKey *resKey)
 {
-  CReserveKey reservekey(pwallet);
+  //if resKey exists, use it, else make a temporary reservekey
+  CReserveKey tmpResKey(pwallet);
+  CReserveKey *reservekey = resKey ? resKey : &tmpResKey;
 
   // Create new block
   auto_ptr<CBlock> pblock(new CBlock());
@@ -4384,7 +4386,7 @@ CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake, const CWalletTx *bu
 
     txNew.vout[0].scriptPubKey << vSolutions[0];
   }else
-    txNew.vout[0].scriptPubKey << reservekey.GetReservedKey();
+    txNew.vout[0].scriptPubKey << reservekey->GetReservedKey();
 
   txNew.vout[0].scriptPubKey << OP_CHECKSIG;
 

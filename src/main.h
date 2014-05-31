@@ -64,7 +64,7 @@ static const int fHaveUPnP = false;
 #endif
 
 static const uint256 hashGenesisBlockOfficial("0x00000766be5a4bb74c040b85a98d2ba2b433c5f4c673912b3331ea6f18d61bea");
-static const uint256 hashGenesisBlockTestNet("0x0000e8c88e9236b8f170af02d8b879932c5bed987bb8c0919e6ed71179f332b2");
+static const uint256 hashGenesisBlockTestNet("0x0000340e7843564f3591c67325512c05d48e468285aa1f1df76353ff61462743");
 
 static const int64 nMaxClockDrift = 2 * 60 * 60;        // two hours
 
@@ -200,7 +200,8 @@ void PrintBlockTree();
 bool ProcessMessages(CNode* pfrom);
 bool SendMessages(CNode* pto, bool fSendTrickle);
 void GenerateSlimcoins(bool fGenerate, CWallet* pwallet);
-CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, const CWalletTx *burnWalletTx=NULL);
+CBlock *CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false, 
+                       const CWalletTx *burnWalletTx=NULL, CReserveKey *resKey=NULL);
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
