@@ -976,7 +976,19 @@ int64 GetProofOfBurnReward(u32int nBurnBits)
   return GetProofOfWorkReward(nBurnBits, true);
 }
 
-static const int64 nTargetTimespan = 30 * 60;  // retargets every 30 minutes
+static inline int64 getTargetTimespan(s32int lastNHeight)
+{
+  //the nTargetTimespan value cannot be too small since in the GetNextTargetRequired function,
+  // the nActualSpacing variable could be negative, but we do not want to be multipling
+  // bnNew by a negative number in: bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
+
+  //from 4259 and on, use new 6 hour retarget time
+  if(lastNHeight >= 4258)
+    return 6 * 60 * 60;
+  else
+    return 30 * 60; //old 30 minute retarget time
+}
+
 static const int64 nTargetSpacingWorkMax = 10 * STAKE_TARGET_SPACING; // 15 minutes
 
 //
@@ -1033,12 +1045,12 @@ static u32int GetNextTargetRequired(const CBlockIndex *pindexLast, bool fProofOf
   int64 nTargetSpacing = fProofOfStake ? STAKE_TARGET_SPACING : 
     min(nTargetSpacingWorkMax, (int64) STAKE_TARGET_SPACING * (1 + pindexLast->nHeight - pindexPrev->nHeight));
 
-  int64 nInterval = nTargetTimespan / nTargetSpacing;
+  int64 nInterval = getTargetTimespan(pindexLast->nHeight) / nTargetSpacing;
   bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
   bnNew /= ((nInterval + 1) * nTargetSpacing);
 
   //we can't make it too easy
-  if(bnNew > bnProofOfWorkLimit)
+  if(bnNew <= 0 || bnNew > bnProofOfWorkLimit)
     bnNew = bnProofOfWorkLimit;
 
   return bnNew.GetCompact();
@@ -1066,7 +1078,7 @@ static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
   bnNew = (bnNew * BURN_HARDER_TARGET * BURN_CONSTANT) / pindexBack->nEffectiveBurnCoins;
 
   //we can't make it too easy
-  if(bnNew > bnProofOfBurnLimit)
+  if(bnNew <= 0 || bnNew > bnProofOfBurnLimit)
     bnNew = bnProofOfBurnLimit;
   
   return bnNew.GetCompact();
