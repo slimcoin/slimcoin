@@ -699,9 +699,9 @@ bool CTxDB::LoadBlockIndex()
         //nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
                     pTestBlkIndex->burnCTxOut, burnHashRet);
-        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits) || 
-           pTestBlkIndex->burnHash != burnHashRet)
+        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
+
       }
     }
   }
