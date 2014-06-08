@@ -33,7 +33,7 @@ extern const std::string CLIENT_DATE;
 // slimcoin version - intended for display purpose ONLY
 #define SLMCOIN_VERSION_MAJOR       0
 #define SLMCOIN_VERSION_MINOR       3
-#define SLMCOIN_VERSION_REVISION    0
+#define SLMCOIN_VERSION_REVISION    1
 #define SLMCOIN_VERSION_BUILD       0
 
 //

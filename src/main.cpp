@@ -1151,15 +1151,30 @@ bool CBlock::CheckProofOfBurn() const
   if(hashBurnBlock != pBurnIndex->GetBlockHash())
     return DoS(10, error("CheckProofOfBurn() : hashBurnBlock does not equal the pBurnIndex's block hash"));
 
-  // Check proof-of-burn hash matches claimed amount
-  uint256 calculatedBurnHash = GetBurnHash();
+  //see if this PoB block is past the intermediate burn hash update
+  const bool fUseIntermediate = use_burn_hash_intermediate(pindexPrev->nHeight + 1);
+
+  //Check proof-of-burn hash matches claimed amount
+  // pindexPrev->nHeight + 1 since use_burn_hash_intermediate works on the height of the current block
+  uint256 calculatedBurnHash = GetBurnHash(false);
+  uint256 intermediateBurnHash = GetBurnHash(fUseIntermediate);
+
   if(!CheckProofOfBurnHash(calculatedBurnHash, nBurnBits))
     return DoS(100, error("CheckProofOfBurn() : proof-of-burn failed"));
 
   //the burn hash recorded in the block must equal the calculated burn hash
   // this is used in DoS detection
-  if(burnHash != calculatedBurnHash)
-    return DoS(75, error("CheckProofOfBurn() : proof-of-burn hashes do not match"));
+  if(burnHash != (fUseIntermediate ? intermediateBurnHash : calculatedBurnHash))
+    return DoS(75, fUseIntermediate ? 
+               error("CheckProofOfBurn() : proof-of-burn hashes do not match\n" //print the intermediate hash error
+                     "\t %s != %s (burnHash, intermediateBurnHash)", 
+                     burnHash.ToString().c_str(), 
+                     intermediateBurnHash.ToString().c_str()) :
+               error("CheckProofOfBurn() : proof-of-burn hashes do not match\n" //print the calculated hash error
+                     "\t %s != %s (burnHash, calculatedBurnHash)", 
+                     burnHash.ToString().c_str(), 
+                     calculatedBurnHash.ToString().c_str()));
+
 
   if(!BurnCheckPubKeys(burnBlkHeight, burnCTx, burnCTxOut))
     return DoS(100, error("CheckProofOfBurn() : Public signatures do not match with burn transactions's"));
@@ -4096,8 +4111,9 @@ s32int nPoWBlocksBetween(s32int startHeight, s32int endHeight)
 // burnValue is the amount of coins burnded
 // 
 // smallestHashRet is the returned proof-of-burn hash 
+// if fRetIntermediate is true, returns the burn hash before the multiplier is applied
 bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,
-                  s32int burnBlkHeight, int64 burnValue, uint256 &smallestHashRet)
+                  s32int burnBlkHeight, int64 burnValue, uint256 &smallestHashRet, bool fRetIntermediate)
 {
   //start off the smallest hash the absolute biggest it can be
   smallestHashRet = ~uint256(0);
@@ -4129,6 +4145,15 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
     ss << burnBlockHash << burnTxHash << hashPrevBlock;
     CBigNum bnHash(Hash(ss.begin(), ss.end()));
     
+    //if the intermediate burn hash is wanted, return now
+    if(fRetIntermediate)
+    {
+      smallestHashRet = bnHash.getuint256();
+      
+      //sucess!
+      return true;
+    }
+
     //apply the multiplier
     bnTest = bnHash * multiplier;
 
@@ -4137,7 +4162,7 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
       return false;
 
     //assign the final bnTest hash to the smallestHashRet
-    if(lastBlkHeight >= 10500)
+    if(lastBlkHeight >= BURN_ROUND_DOWN)
       smallestHashRet = becomeCompact(bnTest.getuint256());
     else
       smallestHashRet = bnTest.getuint256();
@@ -4157,7 +4182,7 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
 //Gets the hash for PoB given only the indexes and a hashPrevBlock, usually the best block's hash at the time
 // This function does the sanity checks, the HashBurnData() does the actual hashing
 bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet)
+                 s32int burnCTxOut, uint256 &smallestHashRet, bool fRetIntermediate)
 {
 
   //make the smallest hash the absolute biggest it can be
@@ -4196,7 +4221,7 @@ bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
 
   //passed all sanity checks, now do the actuall hashing
   return HashBurnData(txHashBlock, hashPrevBlock, burnTx.GetHash(), 
-                      burnBlkHeight , burnTxOut.nValue, smallestHashRet);
+                      burnBlkHeight , burnTxOut.nValue, smallestHashRet, fRetIntermediate);
 }
 
 //Scans all of the hashes of this transaction and returns the smallest one
@@ -4255,7 +4280,7 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet)
 
   //passed all sanity checks, now do the actual hashing
   return HashBurnData(burnWTx.hashBlock, pindexBest->GetBlockHash(), burnWTx.GetHash(), 
-                      pindex->nHeight, burnTxOut.nValue, smallestHashRet);
+                      pindex->nHeight, burnTxOut.nValue, smallestHashRet, false);
 }
 
 //returns the (if found) the best hash with the transaction that produced it
@@ -4686,7 +4711,7 @@ void FormatHashBuffers(CBlock *pblock, char *pmidstate, char *pdata, char *phash
 bool CheckWork(CBlock *pblock, CWallet &wallet, CReserveKey &reservekey)
 {
   uint256 hash = pblock->GetHash();
-  uint256 burnHash = pblock->IsProofOfBurn() ? pblock->GetBurnHash() : ~uint256(0);
+  uint256 burnHash = pblock->IsProofOfBurn() ? pblock->GetBurnHash(false) : ~uint256(0);
 
   uint256 hashTarget = CBigNum().SetCompact(pblock->nBits).getuint256();
   uint256 hashBurnTarget = CBigNum().SetCompact(pblock->nBurnBits).getuint256();
@@ -5009,12 +5034,13 @@ void SlimCoinAfterBurner(CWallet *pwallet)
         smallestWTx.SetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
 
         //hash it as if it was not our block and test if the hash matches our claimed hash
+        // pindexLastBlock->nHeight + 1 since use_burn_hash_intermediate works on the height of the current block
         uint256 hasher;
         GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, 
-                    pblock->burnCTxOut, hasher);
+                    pblock->burnCTxOut, hasher, use_burn_hash_intermediate(pindexLastBlock->nHeight + 1));
         
-        //if the two hashes do not match or this block's IsPoB does not trigger, continue
-        if(hasher != smallestHash || !pblock->IsProofOfBurn())
+        //if this block's IsProofOfBurn() does not trigger, continue
+        if(!pblock->IsProofOfBurn())
           continue;
 
         //TODO: CTransaction errors out when processing a block, no good, at main.cpp :: 491
@@ -5026,7 +5052,7 @@ void SlimCoinAfterBurner(CWallet *pwallet)
         }
 
         //the burn hash needs to be recorded
-        pblock->burnHash = smallestHash;
+        pblock->burnHash = hasher;
 
         strMintWarning = "";
         printf("CPUMiner : proof-of-burn block found %s\n", pblock->GetHash().ToString().c_str()); 

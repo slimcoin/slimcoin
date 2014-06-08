@@ -130,11 +130,28 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 #error BURN_MIN_CONFIRMS must be greater than or equal to 1
 #endif
 
+//ADDED PATCH
+
+//Rounds down the burn hash for all hashes after block 10500, not really needed though
+// has became a legacy thing
+#define BURN_ROUND_DOWN 10500
+
+//at block 13000 and above, when checking burn hash equality in
+// CBlock::CheckProofOfBurn, use the intermediate hash
+#define BURN_INTERMEDIATE_HEIGHT 17000
+
+inline bool use_burn_hash_intermediate(s32int nHeight)
+{
+  return nHeight >= BURN_INTERMEDIATE_HEIGHT ? true : false;
+}
+
+//ADDED PATCH
+
 void SlimCoinAfterBurner(CWallet *pwallet);
 bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,
-                  s32int burnBlkHeight, int64 burnValue, uint256 &smallestHashRet);
+                  s32int burnBlkHeight, int64 burnValue, uint256 &smallestHashRet, bool fRetIntermediate);
 bool GetBurnHash(uint256 hashPrevBlock, s32int burnBlkHeight, s32int burnCTx,
-                 s32int burnCTxOut, uint256 &smallestHashRet);
+                 s32int burnCTxOut, uint256 &smallestHashRet, bool fRetIntermediate);
 bool GetAllTxClassesByIndex(s32int blkHeight, s32int txDepth, s32int txOutDepth, 
                             CBlock &blockRet, CTransaction &txRet, CTxOut &txOutRet);
 
@@ -1138,13 +1155,13 @@ public:
   }
 
   //PoB
-  uint256 GetBurnHash() const
+  uint256 GetBurnHash(bool fRetIntermediate) const
   {
     if(!IsProofOfBurn())
       return ~uint256(0);
 
     uint256 hashRet;
-    if(!::GetBurnHash(hashPrevBlock, burnBlkHeight, burnCTx, burnCTxOut, hashRet))
+    if(!::GetBurnHash(hashPrevBlock, burnBlkHeight, burnCTx, burnCTxOut, hashRet, fRetIntermediate))
       return ~uint256(0);
 
     return hashRet;

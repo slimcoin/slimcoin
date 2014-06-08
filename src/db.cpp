@@ -696,12 +696,36 @@ bool CTxDB::LoadBlockIndex()
       if(pTestBlkIndex->IsProofOfBurn())
       {
         uint256 burnHashRet;
-        //nHeight - 1 since GetBurnHash wants the index of the previous block
+
+        /*
+         * Check if the burn hash meets the burn target requirement
+         */
+
+        //Get the actual burn hash, with the multiplier applied
+        // nHeight - 1 since GetBurnHash wants the index of the previous block
         GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                    pTestBlkIndex->burnCTxOut, burnHashRet);
+                    pTestBlkIndex->burnCTxOut, burnHashRet, false);
+
         if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits))
           return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
 
+        /*
+         * If Slimcoin is past the intermediate hash update, check that too
+         */
+
+        //apply the checking of burn hashes if the height is past the burn intermediate hash change in the client
+        const bool fUseIntermediate = use_burn_hash_intermediate(pTestBlkIndex->nHeight);
+
+        if(fUseIntermediate)
+        {
+          //Get the intermediate burn hash without the multiplier applied
+          // nHeight - 1 since GetBurnHash wants the index of the previous block
+          GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
+                      pTestBlkIndex->burnCTxOut, burnHashRet, true);
+
+          if(pTestBlkIndex->burnHash != burnHashRet)
+            return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
+        }
       }
     }
   }
