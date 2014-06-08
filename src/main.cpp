@@ -35,7 +35,7 @@ unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
-set<uint256> setBurnSeen;
+set<pair<uint256, uint256> > setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
@@ -56,7 +56,6 @@ map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
-set<uint256> setBurnSeenOrphan;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -979,7 +978,7 @@ int64 GetProofOfBurnReward(u32int nBurnBits)
 static inline int64 getTargetTimespan(s32int lastNHeight)
 {
   //the nTargetTimespan value cannot be too small since in the GetNextTargetRequired function,
-  // the nActualSpacing variable could be negative, but we do not want to be multipling
+  // the nActualSpacing variable could be negative, but we do not want to be multiplying
   // bnNew by a negative number in: bnNew *= ((nInterval - 1) * nTargetSpacing + nActualSpacing + nActualSpacing);
 
   //from 4259 and on, use new 6 hour retarget time
@@ -1979,11 +1978,7 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //GetProofOfBurnReward() uses GetPoWReward inside
 //
-//FIX: multi precision in CBlock::CheckPoB burnHash == calcHash
-// in CBigNum numberator has some deviation factor that in.
-// DB also change PoB deserialization to do CBigNum(num).GetCompact() ==
-// that is fine to be like that, but the check block has to be exact
-//
+
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
 {
@@ -2276,8 +2271,12 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   // Duplicate burn block allowed only when there is an orphan child block
   if(pblock->IsProofOfBurn() && setBurnSeen.count(pblock->GetProofOfBurn()) && 
      !mapOrphanBlocksByPrev.count(hash) && !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-    return error("ProcessBlock() : duplicate proof-of-burn\n\t (%s)\n\t for block %s", 
-                 pblock->GetProofOfBurn().ToString().c_str(), 
+    return error("ProcessBlock() : duplicate proof-of-burn\n\t "
+                 "(Burn Hash: %s\n\t "
+                 "(Hash Prev: %s)\n\t "
+                 "for block %s", 
+                 pblock->GetProofOfBurn().first.ToString().c_str(), 
+                 pblock->GetProofOfBurn().second.ToString().c_str(), 
                  hash.ToString().c_str());
 
   // Preliminary checks
@@ -2341,7 +2340,10 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   if(!IsInitialBlockDownload())
     Checkpoints::AskForPendingSyncCheckpoint(pfrom);
 
-  // If don't already have its previous block and is not PoB, shunt it off to holding area until we get it
+  //If don't already have its previous block and is not PoB, shunt it off to holding area until we get it
+  //
+  //There is no need to check for PoB orphan blocks since if the previous block is not
+  // in the block index, then the CBlock::CheckProofOfBurn() will fail
   if(!mapBlockIndex.count(pblock->hashPrevBlock))
   {
     printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
@@ -2362,18 +2364,6 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
         return false;
       }else
         setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
-    }else if(pblock2->IsProofOfBurn())
-    {
-      if(setBurnSeenOrphan.count(pblock2->GetProofOfBurn()) && !mapOrphanBlocksByPrev.count(hash) && 
-         !Checkpoints::WantedByPendingSyncCheckpoint(hash))
-      {
-        error("ProcessBlock() : duplicate proof-of-burn (%s) for orphan block %s", 
-              pblock2->GetProofOfBurn().ToString().c_str(), 
-              hash.ToString().c_str());
-        delete pblock2;
-        return false;
-      }else
-        setBurnSeenOrphan.insert(pblock2->GetProofOfBurn());
     }
 
     mapOrphanBlocks.insert(make_pair(hash, pblock2));
@@ -2414,7 +2404,6 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 
       mapOrphanBlocks.erase(pblockOrphan->GetHash());
       setStakeSeenOrphan.erase(pblockOrphan->GetProofOfStake());
-      setBurnSeenOrphan.erase(pblockOrphan->GetProofOfBurn());
       delete pblockOrphan;
     }
 
@@ -4148,7 +4137,10 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
       return false;
 
     //assign the final bnTest hash to the smallestHashRet
-    smallestHashRet = bnTest.getuint256();
+    if(lastBlkHeight >= 10500)
+      smallestHashRet = becomeCompact(bnTest.getuint256());
+    else
+      smallestHashRet = bnTest.getuint256();
   }
 
   //impossible, used as a saftey net if something went wrong
@@ -4700,10 +4692,7 @@ bool CheckWork(CBlock *pblock, CWallet &wallet, CReserveKey &reservekey)
   uint256 hashBurnTarget = CBigNum().SetCompact(pblock->nBurnBits).getuint256();
 
   if(pblock->IsProofOfWork() && hash > hashTarget)
-  {
-    printf("WOWOWO No GOOD %s %u\n", hash.ToString().c_str(), pblock->nNonce);
     return error("SlimCoinMiner : proof-of-work not meeting target");
-  }
 
   if(pblock->IsProofOfBurn() && burnHash > hashBurnTarget)
     return error("SlimCoinMiner : proof-of-burn not meeting target");

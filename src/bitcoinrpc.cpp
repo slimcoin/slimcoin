@@ -41,7 +41,7 @@ using namespace json_spirit;
 void ThreadRPCServer2(void* parg);
 
 // Key used by getwork/getblocktemplate miners.
-// Allocated in StartRPCThreads, free'd in StopRPCThreads
+// Allocated and free'd in ThreadRPCServer
 CReserveKey* pMiningKey = NULL;
 
 static std::string strRPCUserColonPass;

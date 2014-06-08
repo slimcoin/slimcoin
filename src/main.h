@@ -78,7 +78,7 @@ extern CScript COINBASE_FLAGS;
 extern CCriticalSection cs_main;
 extern std::map<uint256, CBlockIndex*> mapBlockIndex;
 extern std::set<std::pair<COutPoint, unsigned int> > setStakeSeen;
-extern std::set<uint256> setBurnSeen;
+extern std::set<std::pair<uint256, uint256> > setBurnSeen;
 extern uint256 hashGenesisBlock;
 extern unsigned int nStakeMinAge;
 extern int nCoinbaseMaturity;
@@ -178,6 +178,16 @@ inline bool IsBurnAddress(const CBitcoinAddress &address, bool any=false)
     return address == burnAddress;
   }
     
+}
+
+//makes a uint256 number into its compact form and returns it as a uint256 again
+inline const uint256 becomeCompact(const uint256 &num)
+{
+  //+ 1 at the end so that hashes that are originally above target, when
+  // made compact, will still not make the limit, 
+  //ex: hash   0x000000221312312 -> 0x00000022131000...01 //still does not make the target
+  //    target 0x000000221310000...000
+  return CBigNum().SetCompact(CBigNum(num).GetCompact()).getuint256() + 1;
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1208,9 +1218,9 @@ public:
       std::make_pair(COutPoint(), (unsigned int)0);
   }
 
-  uint256 GetProofOfBurn() const
+  std::pair<uint256, uint256> GetProofOfBurn() const
   {
-    return burnHash;
+    return std::make_pair(burnHash, hashPrevBlock);
   }
 
   // slimcoin: get max transaction timestamp
@@ -1665,9 +1675,9 @@ public:
     return std::make_pair(prevoutStake, nStakeTime);
   }
 
-  uint256 GetProofOfBurn() const
+  std::pair<uint256, uint256> GetProofOfBurn() const
   {
-    return burnHash;
+    return std::make_pair(burnHash, pprev->GetBlockHash());
   }
 
 
