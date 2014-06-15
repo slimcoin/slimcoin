@@ -11,9 +11,9 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
 bool CTxDB::LoadBlockIndex() in db.cpp
 	There should be an exact hash comparison in the place where the Proof of Burn blocks are checked. The exact hash comparison would be pTestBlkIndex->burnHash == burnHashRet;
 
-//at block 13000 and above, when checking burn hash equality in
+//at block 17000 and above, when checking burn hash equality in
 // CBlock::CheckProofOfBurn, use the intermediate hash
-#define BURN_INTERMEDIATE_HEIGHT 14000
+#define BURN_INTERMEDIATE_HEIGHT 17000
 
 inline bool use_burn_hash_intermediate(s32int nHeight)
 {
