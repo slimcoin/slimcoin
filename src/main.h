@@ -1186,7 +1186,7 @@ public:
 
   bool CheckBurnEffectiveCoins(int64 *calcEffCoinsRet = NULL) const;
 
-  bool CheckProofOfBurn() const;
+  bool CheckProofOfBurn(uint256 &blockHash) const;
 
   //PoB
 

@@ -34,8 +34,6 @@ CTxMemPool mempool;
 unsigned int nTransactionsUpdated = 0;
 
 map<uint256, CBlockIndex*> mapBlockIndex;
-set<pair<COutPoint, unsigned int> > setStakeSeen;
-set<pair<uint256, uint256> > setBurnSeen;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
@@ -56,6 +54,9 @@ map<uint256, CBlock*> mapOrphanBlocks;
 multimap<uint256, CBlock*> mapOrphanBlocksByPrev;
 set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
+set<pair<COutPoint, unsigned int> > setStakeSeen;
+set<pair<uint256, uint256> > setBurnSeen;
+set<pair<uint256, uint256> > setBurnSeenOrphan;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -1116,7 +1117,7 @@ bool CheckProofOfBurnHash(uint256 hash, u32int nBurnBits)
   return true;
 }
 
-bool CBlock::CheckProofOfBurn() const
+bool CBlock::CheckProofOfBurn(uint256 &blockHash) const
 {
   if(!IsProofOfBurn())
     return false;
@@ -1125,7 +1126,15 @@ bool CBlock::CheckProofOfBurn() const
   // if the previous block has not been received yet
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
   if(mi == mapBlockIndex.end() || !mi->second)
-    return DoS(1, error("CheckProofOfBurn() : INFO: prev block not found"));
+  {
+    error("CheckProofOfBurn() : INFO: prev block not found");
+
+    //if another block requires this one, return true so that it can be recorded as an orphan block
+    if(mapOrphanBlocksByPrev.count(blockHash))
+      return true;
+    else
+      return false;
+  }
 
   CBlockIndex *pindexPrev = mi->second;
   
@@ -2315,7 +2324,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   // Verify the burn hash, matching signatures between block and burn tx, and effective coins
   if(pblock->IsProofOfBurn())
   {
-    if(!pblock->CheckProofOfBurn())
+    if(!pblock->CheckProofOfBurn(hash))
     {
       //do not error here as we expect this during initial block download
       // because the previous blocks may not have been received yet
@@ -2355,10 +2364,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   if(!IsInitialBlockDownload())
     Checkpoints::AskForPendingSyncCheckpoint(pfrom);
 
-  //If don't already have its previous block and is not PoB, shunt it off to holding area until we get it
-  //
-  //There is no need to check for PoB orphan blocks since if the previous block is not
-  // in the block index, then the CBlock::CheckProofOfBurn() will fail
+  //If we do not already have its previous block, shunt it off to holding area until we get it
   if(!mapBlockIndex.count(pblock->hashPrevBlock))
   {
     printf("ProcessBlock: ORPHAN BLOCK, prev=%s\n", pblock->hashPrevBlock.ToString().substr(0,20).c_str());
@@ -2379,8 +2385,21 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
         return false;
       }else
         setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
+    }else if(pblock2->IsProofOfBurn())
+    {
+      if(setBurnSeenOrphan.count(pblock2->GetProofOfBurn()) && !mapOrphanBlocksByPrev.count(hash) &&
+         !Checkpoints::WantedByPendingSyncCheckpoint(hash))
+      {
+        error("ProcessBlock() : duplicate proof-of-burn (%s, %s) for orphan block %s",
+              pblock2->GetProofOfBurn().first.ToString().c_str(),
+              pblock2->GetProofOfBurn().second.ToString().c_str(),
+              hash.ToString().c_str());
+        delete pblock2;
+        return false;
+      }else
+        setBurnSeenOrphan.insert(pblock2->GetProofOfBurn());
     }
-
+    
     mapOrphanBlocks.insert(make_pair(hash, pblock2));
     mapOrphanBlocksByPrev.insert(make_pair(pblock2->hashPrevBlock, pblock2));
 
@@ -2419,6 +2438,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 
       mapOrphanBlocks.erase(pblockOrphan->GetHash());
       setStakeSeenOrphan.erase(pblockOrphan->GetProofOfStake());
+      setBurnSeenOrphan.erase(pblockOrphan->GetProofOfBurn());
       delete pblockOrphan;
     }
 

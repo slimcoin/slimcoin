@@ -679,7 +679,7 @@ bool CTxDB::LoadBlockIndex()
 
   // Verify blocks in the best chain
   int nCheckLevel = GetArg("-checklevel", 1);
-  int nCheckDepth = GetArg( "-checkblocks", 2500);
+  int nCheckDepth = GetArg("-checkblocks", 2500);
 
   if(!nCheckDepth)
     nCheckDepth = 1000000000; // suffices until the year 19000
@@ -695,6 +695,14 @@ bool CTxDB::LoadBlockIndex()
       //if this index is a proof-of-burn, check it
       if(pTestBlkIndex->IsProofOfBurn())
       {
+        //check if this pindex is in the main block chain
+        // pindexByHeight() internally uses the linked list of block indexes
+        // starting from pindexBest and working its way back
+        //
+        //if it is not, no need to check
+        if(!pindexByHeight(pTestBlkIndex->nHeight))
+          continue;
+
         uint256 burnHashRet;
 
         /*
