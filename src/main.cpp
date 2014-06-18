@@ -56,7 +56,7 @@ set<pair<COutPoint, unsigned int> > setStakeSeenOrphan;
 map<uint256, uint256> mapProofOfStake;
 set<pair<COutPoint, unsigned int> > setStakeSeen;
 set<pair<uint256, uint256> > setBurnSeen;
-set<pair<uint256, uint256> > setBurnSeenOrphan;
+set<uint256> setBurnSeenOrphan;
 
 map<uint256, CDataStream*> mapOrphanTransactions;
 map<uint256, map<uint256, CDataStream*> > mapOrphanTransactionsByPrev;
@@ -1117,7 +1117,7 @@ bool CheckProofOfBurnHash(uint256 hash, u32int nBurnBits)
   return true;
 }
 
-bool CBlock::CheckProofOfBurn(uint256 &blockHash) const
+bool CBlock::CheckProofOfBurn() const
 {
   if(!IsProofOfBurn())
     return false;
@@ -1126,15 +1126,7 @@ bool CBlock::CheckProofOfBurn(uint256 &blockHash) const
   // if the previous block has not been received yet
   map<uint256, CBlockIndex*>::iterator mi = mapBlockIndex.find(hashPrevBlock);
   if(mi == mapBlockIndex.end() || !mi->second)
-  {
-    error("CheckProofOfBurn() : INFO: prev block not found");
-
-    //if another block requires this one, return true so that it can be recorded as an orphan block
-    if(mapOrphanBlocksByPrev.count(blockHash))
-      return true;
-    else
-      return false;
-  }
+    return error("CheckProofOfBurn() : INFO: prev block not found");
 
   CBlockIndex *pindexPrev = mi->second;
   
@@ -2324,12 +2316,16 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
   // Verify the burn hash, matching signatures between block and burn tx, and effective coins
   if(pblock->IsProofOfBurn())
   {
-    if(!pblock->CheckProofOfBurn(hash))
+    if(!pblock->CheckProofOfBurn())
     {
       //do not error here as we expect this during initial block download
       // because the previous blocks may not have been received yet
       printf("WARNING: ProcessBlock() : check proof-of-burn failed for block %s\n", hash.ToString().c_str());
-      return false;
+
+      //if another block requires this one, don't error out, this PoB block will be accepted as an orphan
+      // only return false when this PoB block is lone
+      if(!mapOrphanBlocksByPrev.count(hash))
+        return false;
     }
   }
 
@@ -2387,7 +2383,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
         setStakeSeenOrphan.insert(pblock2->GetProofOfStake());
     }else if(pblock2->IsProofOfBurn())
     {
-      if(setBurnSeenOrphan.count(pblock2->GetProofOfBurn()) && !mapOrphanBlocksByPrev.count(hash) &&
+      if(setBurnSeenOrphan.count(hash) && !mapOrphanBlocksByPrev.count(hash) &&
          !Checkpoints::WantedByPendingSyncCheckpoint(hash))
       {
         error("ProcessBlock() : duplicate proof-of-burn (%s, %s) for orphan block %s",
@@ -2397,7 +2393,7 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
         delete pblock2;
         return false;
       }else
-        setBurnSeenOrphan.insert(pblock2->GetProofOfBurn());
+        setBurnSeenOrphan.insert(hash);
     }
     
     mapOrphanBlocks.insert(make_pair(hash, pblock2));
@@ -2432,13 +2428,14 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
          mi != mapOrphanBlocksByPrev.upper_bound(hashPrev); ++mi)
     {
       CBlock *pblockOrphan = (*mi).second;
+      uint256 pblockOrphanHash = pblockOrphan->GetHash();
 
       if(pblockOrphan->AcceptBlock())
-        vWorkQueue.push_back(pblockOrphan->GetHash());
+        vWorkQueue.push_back(pblockOrphanHash);
 
-      mapOrphanBlocks.erase(pblockOrphan->GetHash());
+      mapOrphanBlocks.erase(pblockOrphanHash);
       setStakeSeenOrphan.erase(pblockOrphan->GetProofOfStake());
-      setBurnSeenOrphan.erase(pblockOrphan->GetProofOfBurn());
+      setBurnSeenOrphan.erase(pblockOrphanHash);
       delete pblockOrphan;
     }
 

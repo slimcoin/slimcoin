@@ -136,9 +136,9 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 // has became a legacy thing
 #define BURN_ROUND_DOWN 10500
 
-//at block 17000 and above, when checking burn hash equality in
+//at block 16001 and above, when checking burn hash equality in
 // CBlock::CheckProofOfBurn, use the intermediate hash
-#define BURN_INTERMEDIATE_HEIGHT 17000
+#define BURN_INTERMEDIATE_HEIGHT 16001
 
 inline bool use_burn_hash_intermediate(s32int nHeight)
 {
@@ -1186,7 +1186,7 @@ public:
 
   bool CheckBurnEffectiveCoins(int64 *calcEffCoinsRet = NULL) const;
 
-  bool CheckProofOfBurn(uint256 &blockHash) const;
+  bool CheckProofOfBurn() const;
 
   //PoB
 

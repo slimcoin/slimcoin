@@ -34,6 +34,7 @@ namespace Checkpoints
     ( 10198,  uint256("0x000000086631340ce44f7ee72e7125654eef62181a08bacf69b42f797fd7bb4c"))
     ( 10503,  uint256("0x1a433766560d719d5ece18aa190b00fd503d733e2162e511df0998df5c8680f5"))
     ( 15165,  uint256("0x0000017fba5ef709509c7380e3e128a69a5ab3c60b526c8345aff592dc8d8f81"))
+    ( 15935,  uint256("0xaf377a2f3be16d3c3d82ad9158a3c24b5e8a7a1af6e315b486a390c651d70ff5"))
     ;
 
   bool CheckHardened(int nHeight, const uint256 &hash)
@@ -45,6 +46,12 @@ namespace Checkpoints
     if(i == mapCheckpoints.end()) 
       return true;
     return hash == i->second;
+  }
+
+  bool CheckpointExists(s32int nHeight)
+  {
+    MapCheckpoints::const_iterator i = mapCheckpoints.find(nHeight);
+    return i != mapCheckpoints.end();
   }
 
   int GetTotalBlocksEstimate()

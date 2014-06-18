@@ -688,20 +688,12 @@ bool CTxDB::LoadBlockIndex()
 
   {
     //after all of the indexes are loaded, now check the proof-of-burn blocks
-    BOOST_FOREACH(const PAIRTYPE(uint256, CBlockIndex*) &item, mapBlockIndex)
+    for(const CBlockIndex *pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
     {
-      const CBlockIndex *pTestBlkIndex = item.second;
 
       //if this index is a proof-of-burn, check it
-      if(pTestBlkIndex->IsProofOfBurn())
+      if(pindex->IsProofOfBurn())
       {
-        //check if this pindex is in the main block chain
-        // pindexByHeight() internally uses the linked list of block indexes
-        // starting from pindexBest and working its way back
-        //
-        //if it is not, no need to check
-        if(!pindexByHeight(pTestBlkIndex->nHeight))
-          continue;
 
         uint256 burnHashRet;
 
@@ -711,28 +703,28 @@ bool CTxDB::LoadBlockIndex()
 
         //Get the actual burn hash, with the multiplier applied
         // nHeight - 1 since GetBurnHash wants the index of the previous block
-        GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                    pTestBlkIndex->burnCTxOut, burnHashRet, false);
+        GetBurnHash(pindex->pprev->GetBlockHash(), pindex->burnBlkHeight, pindex->burnCTx, 
+                    pindex->burnCTxOut, burnHashRet, false);
 
-        if(!CheckProofOfBurnHash(burnHashRet, pTestBlkIndex->nBurnBits))
-          return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
+        if(!CheckProofOfBurnHash(burnHashRet, pindex->nBurnBits))
+          return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pindex->nHeight);
 
         /*
          * If Slimcoin is past the intermediate hash update, check that too
          */
 
         //apply the checking of burn hashes if the height is past the burn intermediate hash change in the client
-        const bool fUseIntermediate = use_burn_hash_intermediate(pTestBlkIndex->nHeight);
+        const bool fUseIntermediate = use_burn_hash_intermediate(pindex->nHeight);
 
         if(fUseIntermediate)
         {
           //Get the intermediate burn hash without the multiplier applied
           // nHeight - 1 since GetBurnHash wants the index of the previous block
-          GetBurnHash(pTestBlkIndex->pprev->GetBlockHash(), pTestBlkIndex->burnBlkHeight, pTestBlkIndex->burnCTx, 
-                      pTestBlkIndex->burnCTxOut, burnHashRet, true);
+          GetBurnHash(pindex->pprev->GetBlockHash(), pindex->burnBlkHeight, pindex->burnCTx, 
+                      pindex->burnCTxOut, burnHashRet, true);
 
-          if(pTestBlkIndex->burnHash != burnHashRet)
-            return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pTestBlkIndex->nHeight);
+          if(pindex->burnHash != burnHashRet)
+            return error("%s : deserialize error on PoB index %d", __PRETTY_FUNCTION__, pindex->nHeight);
         }
       }
     }
@@ -852,6 +844,44 @@ bool CTxDB::LoadBlockIndex()
               }
           }
         }
+      }
+    }
+  }
+
+  {
+    //start the lastCheckpointHeight at the genesis block
+    s32int lastCheckpointHeight = 0;
+    const CBlockIndex *lastCheckpointIndex = NULL;
+
+    //go through the indexes again, if the pindex's height matches a hard coded checkpoints, but their
+    // hashes differ, set pindexFork to the last hard coded checkpoint
+    // starts from front to back since if there is a fork found, once we set the pindexFork, it is
+    // not needed to continue checking since every other block ahead will be in the forked blockchain
+    for(const CBlockIndex *pindex = pindexGenesisBlock; pindex && pindex->pnext; pindex = pindex->pnext)
+    {
+      //if a checkpoint of height, pindex->nHeight does not exist, continue
+      if(!Checkpoints::CheckpointExists(pindex->nHeight))
+        continue;
+
+      //if the pindex's height is in the mapCheckpoints and the hashes differ
+      if(!Checkpoints::CheckHardened(pindex->nHeight, pindex->GetBlockHash()))
+      {
+        printf("Block index at height %d mismatches hard checkpoint's hash\n", pindex->nHeight);
+        //only set the pindexFork if it is either NULL or on a block after the lastCheckpointHeight
+        if(!pindexFork || pindexFork->nHeight > lastCheckpointHeight)
+        {
+          printf("\tpindexFork set to last checkpoint at height %d\n", lastCheckpointHeight);
+          pindexFork = (CBlockIndex*)lastCheckpointIndex;
+        }
+
+        //break since a fork was set, and everything after it will be forked off
+        // pindexFork may sometimes not be set if it is set with a pindex, which is
+        // before lastCheckpointHeight
+        break;
+      }else{
+        //record this pindex and the last nHeight checkpoint
+        lastCheckpointHeight = pindex->nHeight;
+        lastCheckpointIndex = pindex;
       }
     }
   }
