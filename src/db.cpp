@@ -857,7 +857,7 @@ bool CTxDB::LoadBlockIndex()
     // hashes differ, set pindexFork to the last hard coded checkpoint
     // starts from front to back since if there is a fork found, once we set the pindexFork, it is
     // not needed to continue checking since every other block ahead will be in the forked blockchain
-    for(const CBlockIndex *pindex = pindexGenesisBlock; pindex && pindex->pnext; pindex = pindex->pnext)
+    for(const CBlockIndex *pindex = pindexGenesisBlock; pindex; pindex = pindex->pnext)
     {
       //if a checkpoint of height, pindex->nHeight does not exist, continue
       if(!Checkpoints::CheckpointExists(pindex->nHeight))
