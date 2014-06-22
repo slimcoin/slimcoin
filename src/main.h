@@ -130,22 +130,22 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 #error BURN_MIN_CONFIRMS must be greater than or equal to 1
 #endif
 
-//ADDED PATCH
+//ADDED PATCHES
 
 //Rounds down the burn hash for all hashes after block 10500, not really needed though
 // has became a legacy thing
 #define BURN_ROUND_DOWN 10500
 
-//at block 16001 and above, when checking burn hash equality in
+//at block 15936 and above, when checking burn hash equality in
 // CBlock::CheckProofOfBurn, use the intermediate hash
-#define BURN_INTERMEDIATE_HEIGHT 16001
+#define BURN_INTERMEDIATE_HEIGHT 15936
 
 inline bool use_burn_hash_intermediate(s32int nHeight)
 {
   return nHeight >= BURN_INTERMEDIATE_HEIGHT ? true : false;
 }
 
-//ADDED PATCH
+//ADDED PATCHES
 
 void SlimCoinAfterBurner(CWallet *pwallet);
 bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,

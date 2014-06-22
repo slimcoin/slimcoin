@@ -982,9 +982,7 @@ void MapPort(bool /* unused fMapPort */)
 // The second name should resolve to a list of seed addresses.
 // testnet dns seed begins with 't', all else are slimcoin dns seeds.
 static const char *strDNSSeed[][2] = {
-  {"seed", "seed.slimcoin.net"},
-  {"altcointech", "dnsseed.slm.altcointech.net"},
-  {"tnseed", "tnseed.slimcoin.net"},
+  {"seed", "dnsseed.slimcoinpool.com"}
 };
 
 void ThreadDNSAddressSeed(void* parg)

@@ -51,6 +51,10 @@ namespace Checkpoints
 
   bool CheckpointExists(s32int nHeight)
   {
+    //the testnet hash no checkpoints
+    if(fTestNet)
+      return false;
+
     MapCheckpoints::const_iterator i = mapCheckpoints.find(nHeight);
     return i != mapCheckpoints.end();
   }
