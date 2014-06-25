@@ -145,6 +145,12 @@ inline bool use_burn_hash_intermediate(s32int nHeight)
   return nHeight >= BURN_INTERMEDIATE_HEIGHT ? true : false;
 }
 
+//Adjusts the trust values for PoW and PoB blocks
+#define CHAINCHECKS_SWITCH_TIME 2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
+
+//Adjusts PoS targets
+#define TARGETS_SWITCH_TIME     2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
+
 //ADDED PATCHES
 
 void SlimCoinAfterBurner(CWallet *pwallet);
@@ -1569,14 +1575,7 @@ public:
     return (int64)nTime;
   }
 
-  CBigNum GetBlockTrust() const
-  {
-    CBigNum bnTarget;
-    bnTarget.SetCompact(nBits);
-    if (bnTarget <= 0)
-      return 0;
-    return (IsProofOfStake() ? (CBigNum(1)<<256) / (bnTarget+1) : 1);
-  }
+  CBigNum GetBlockTrust() const;
 
   bool IsInMainChain() const
   {

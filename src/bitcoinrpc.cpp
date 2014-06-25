@@ -28,6 +28,10 @@
 typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> SSLStream;
 
 #define printf OutputDebugStringF
+
+#define FORMAT_PARAM(name, arg, type) if(strMethod == name && n > arg) ConvertTo<type> (params[arg])
+
+
 // MinGW 3.4.5 gets "fatal error: had to relocate PCH" if the json headers are
 // precompiled in headers.h.  The problem might be when the pch file goes over
 // a certain size around 145MB.  If we need access to json_spirit outside this
@@ -288,6 +292,51 @@ Value getconnectioncount(const Array& params, bool fHelp)
   return (int)vNodes.size();
 }
 
+static void CopyNodeStats(std::vector<CNodeStats>& vstats)
+{
+  vstats.clear();
+
+  LOCK(cs_vNodes);
+  vstats.reserve(vNodes.size());
+  BOOST_FOREACH(CNode* pnode, vNodes) {
+    CNodeStats stats;
+    pnode->copyStats(stats);
+    vstats.push_back(stats);
+  }
+}
+
+Value getpeerinfo(const Array& params, bool fHelp)
+{
+  if (fHelp || params.size() != 0)
+    throw runtime_error(
+      "getpeerinfo\n"
+      "Returns data about each connected network node.");
+
+  vector<CNodeStats> vstats;
+  CopyNodeStats(vstats);
+
+  Array ret;
+
+  BOOST_FOREACH(const CNodeStats& stats, vstats) {
+    Object obj;
+
+    obj.push_back(Pair("addr", stats.addrName));
+    obj.push_back(Pair("services", strprintf("%08"PRI64x, stats.nServices)));
+    obj.push_back(Pair("lastsend", (boost::int64_t)stats.nLastSend));
+    obj.push_back(Pair("lastrecv", (boost::int64_t)stats.nLastRecv));
+    obj.push_back(Pair("conntime", (boost::int64_t)stats.nTimeConnected));
+    obj.push_back(Pair("version", stats.nVersion));
+    obj.push_back(Pair("subver", stats.strSubVer));
+    obj.push_back(Pair("inbound", stats.fInbound));
+    obj.push_back(Pair("releasetime", (boost::int64_t)stats.nReleaseTime));
+    obj.push_back(Pair("height", stats.nStartingHeight));
+    obj.push_back(Pair("banscore", stats.nMisbehavior));
+
+    ret.push_back(obj);
+  }
+    
+  return ret;
+}
 
 Value getdifficulty(const Array& params, bool fHelp)
 {
@@ -1448,6 +1497,85 @@ Value listreceivedbyaccount(const Array& params, bool fHelp)
       "  \"confirmations\" : number of confirmations of the most recent transaction included");
 
   return ListReceived(params, true);
+}
+
+static bool listBurnMintedSort(pair<Object, s32int> i, pair<Object, s32int> j)
+{
+  return i.second > j.second;
+}
+
+Value listburnminted(const Array& params, bool fHelp)
+{
+  if(fHelp || params.size() > 1)
+    throw runtime_error(
+      "listburnminted [verbose=false]\n"
+      "Returns the blocks and respective rewards for all\n"
+      "\tProof-of-Burn blocks found by this wallet.");
+
+  bool fVerbose = false;
+  if(params.size() > 0)
+    fVerbose = params[0].get_bool();
+
+  vector<pair<Object, s32int> > entries;
+
+  for(map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); 
+      it != pwalletMain->mapWallet.end(); ++it)
+  {
+    CWalletTx wtx = it->second;
+    CBlockIndex *pindex;
+    s32int confirms;
+
+    //check if this transaction is in the main chain
+    confirms = wtx.GetDepthInMainChain(pindex);
+    if(!confirms)
+      continue;
+
+    //check if the transaction is a coin base transaction and this block is a PoB block
+    if(!wtx.IsCoinBase() || !pindex->IsProofOfBurn())
+      continue;
+
+    Object entry;
+    entry.push_back(Pair("PoB Block Hash", pindex->GetBlockHash().GetHex()));
+    entry.push_back(Pair("PoB Hash", pindex->burnHash.GetHex()));
+
+
+    /***Unused variables only needed as function arguments for wtx.GetAmounts()***/
+    int64 nFee;
+    string strSentAccount;
+    list<pair<CBitcoinAddress, int64> > listReceived;
+    list<pair<CBitcoinAddress, int64> > listSent;
+    /***Unused variables only needed as function arguments for wtx.GetAmounts()***/
+
+    int64 nGeneratedImmature, nGeneratedMature;    
+    wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount);
+
+    //Reward is immature
+    if(nGeneratedImmature)
+    {
+      entry.push_back(Pair("category", "immature"));
+      entry.push_back(Pair("amount", ValueFromAmount(nGeneratedImmature)));
+    }else{ //reward is mature
+      entry.push_back(Pair("category", "mint by burn"));
+      entry.push_back(Pair("amount", ValueFromAmount(nGeneratedMature)));
+    }
+
+    if(fVerbose)
+      WalletTxToJSON(wtx, entry);
+
+    entries.push_back(make_pair(entry, confirms));
+
+  }
+
+  //sort the entries, from largest amount of confirmations to the smallest
+  sort(entries.begin(), entries.end(), listBurnMintedSort);
+
+  //take each entry and make an Array of it
+  Array ret;
+
+  BOOST_FOREACH(PAIRTYPE(Object, int) &entry, entries)
+    ret.push_back(entry.first);
+
+  return ret;
 }
 
 void ListTransactions(const CWalletTx& wtx, const string& strAccount, int nMinDepth, bool fLong, Array& ret)
@@ -2711,6 +2839,7 @@ static const CRPCCommand vRPCCommands[] =
   { "getburndata",              &getburndata,            true   },
   { "getconnectioncount",       &getconnectioncount,     true   },
   { "getdifficulty",            &getdifficulty,          true   },
+  { "getpeerinfo",              &getpeerinfo,            true   },
   { "getgenerate",              &getgenerate,            true   },
   { "setgenerate",              &setgenerate,            true   },
   { "gethashespersec",          &gethashespersec,        true   },
@@ -2743,6 +2872,7 @@ static const CRPCCommand vRPCCommands[] =
   { "getblockhash",             &getblockhash,           false  },
   { "gettransaction",           &gettransaction,         false  },
   { "listtransactions",         &listtransactions,       false  },
+  { "listburnminted",           &listburnminted,         false  },
   { "signmessage",              &signmessage,            false  },
   { "verifymessage",            &verifymessage,          false  },
   { "getwork",                  &getwork,                true   },
@@ -3349,17 +3479,18 @@ void ConvertTo(Value& value)
 Array RPCConvertValues(const std::string &strMethod, const std::vector<std::string> &strParams)
 {
   // Parameters default to strings
-    Array params;
-    BOOST_FOREACH(const std::string &param, strParams)
-        params.push_back(param);
-
-    int n = params.size();
+  Array params;
+  BOOST_FOREACH(const std::string &param, strParams)
+    params.push_back(param);
+  
+  int n = params.size();
 
   //
   // Special case non-string parameter types
   //
-  if(strMethod == "setgenerate"            && n > 0) ConvertTo<bool>            (params[0]);
-  if(strMethod == "setgenerate"            && n > 1) ConvertTo<boost::int64_t>  (params[1]);
+
+  FORMAT_PARAM("setgenerate", 0, bool);
+  FORMAT_PARAM("setgenerate", 1, boost::int64_t);
   if(strMethod == "sendtoaddress"          && n > 1) ConvertTo<double>          (params[1]);
   if(strMethod == "settxfee"               && n > 0) ConvertTo<double>          (params[0]);
   if(strMethod == "getreceivedbyaddress"   && n > 1) ConvertTo<boost::int64_t>  (params[1]);
@@ -3381,6 +3512,7 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
   if(strMethod == "listtransactions"       && n > 1) ConvertTo<bool>            (params[1]);
   if(strMethod == "listtransactions"       && n > 2) ConvertTo<boost::int64_t>  (params[2]);
   if(strMethod == "listtransactions"       && n > 3) ConvertTo<boost::int64_t>  (params[3]);
+  if(strMethod == "listburnminted"         && n > 0) ConvertTo<bool>            (params[0]);
   if(strMethod == "listaccounts"           && n > 0) ConvertTo<boost::int64_t>  (params[0]);
   if(strMethod == "walletpassphrase"       && n > 1) ConvertTo<boost::int64_t>  (params[1]);
   if(strMethod == "walletpassphrase"       && n > 2) ConvertTo<bool>            (params[2]);

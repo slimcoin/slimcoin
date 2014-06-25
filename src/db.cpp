@@ -734,6 +734,7 @@ bool CTxDB::LoadBlockIndex()
   printf("Verifying last %i blocks at level %i\n", nCheckDepth, nCheckLevel);
   CBlockIndex* pindexFork = NULL;
   map<pair<unsigned int, unsigned int>, CBlockIndex*> mapBlockPos;
+
   for(CBlockIndex* pindex = pindexBest; pindex && pindex->pprev; pindex = pindex->pprev)
   {
     if(pindex->nHeight < nBestHeight - nCheckDepth)

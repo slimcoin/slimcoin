@@ -37,7 +37,9 @@ map<uint256, CBlockIndex*> mapBlockIndex;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
-static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007ffff....
+static CBigNum bnProofOfStakeLimit(~uint256(0) >> 27); //0x0000001ffff....fff
+static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007fffff....fff
+static uint256 nPoWBase(~uint256(0) >> 24); //6 preceding 0s, 24/4 since every hex = 4 bits
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
 int nCoinbaseMaturity = COINBASE_MATURITY_SLM;
 CBlockIndex *pindexGenesisBlock = NULL;
@@ -991,24 +993,52 @@ static inline int64 getTargetTimespan(s32int lastNHeight)
 
 static const int64 nTargetSpacingWorkMax = 10 * STAKE_TARGET_SPACING; // 15 minutes
 
+// select stake target limit according to hard-coded conditions
+static inline CBigNum GetProofOfStakeLimit(u32int nTime)
+{
+  if(nTime > TARGETS_SWITCH_TIME)
+    return bnProofOfStakeLimit;
+
+  return bnProofOfWorkLimit; // return bnProofOfWorkLimit of none matched
+}
+
 //
-// minimum amount of work that could possibly be required nTime after
-// minimum work required was nBase
+// maximum nBits value could possible be required nTime after
 //
-u32int ComputeMinWork(u32int nBase, int64 nTime)
+u32int ComputeMaxBits(CBigNum bnTargetLimit, u32int nBase, int64 nTime)
 {
   CBigNum bnResult;
   bnResult.SetCompact(nBase);
   bnResult *= 2;
-  while(nTime > 0 && bnResult < bnProofOfWorkLimit)
+  while(nTime > 0 && bnResult < bnTargetLimit)
   {
     // Maximum 200% adjustment per day...
     bnResult *= 2;
     nTime -= 24 * 60 * 60;
   }
-  if(bnResult > bnProofOfWorkLimit)
-    bnResult = bnProofOfWorkLimit;
+
+  if(bnResult > bnTargetLimit)
+    bnResult = bnTargetLimit;
+
   return bnResult.GetCompact();
+}
+
+//
+// minimum amount of work that could possibly be required nTime after
+// minimum proof-of-work required was nBase
+//
+unsigned int ComputeMinWork(unsigned int nBase, int64 nTime)
+{
+  return ComputeMaxBits(bnProofOfWorkLimit, nBase, nTime);
+}
+
+//
+// minimum amount of stake that could possibly be required nTime after
+// minimum proof-of-stake required was nBase
+//
+unsigned int ComputeMinStake(unsigned int nBase, int64 nTime, unsigned int nBlockTime)
+{
+  return ComputeMaxBits(GetProofOfStakeLimit(nBlockTime), nBase, nTime);
 }
 
 // slimcoin: find last block index up to pindex
@@ -1023,8 +1053,10 @@ const CBlockIndex *GetLastBlockIndex(const CBlockIndex *pindex, bool fProofOfSta
 
 static u32int GetNextTargetRequired(const CBlockIndex *pindexLast, bool fProofOfStake)
 {
+  const CBigNum bnTargetLimit = fProofOfStake ? GetProofOfStakeLimit(pindexLast->nTime) : bnProofOfWorkLimit;
+
   if(pindexLast == NULL)
-    return bnProofOfWorkLimit.GetCompact(); // genesis block
+    return bnTargetLimit.GetCompact(); // genesis block
 
   const CBlockIndex* pindexPrev = GetLastBlockIndex(pindexLast, fProofOfStake);
   if(pindexPrev->pprev == NULL)
@@ -1050,8 +1082,8 @@ static u32int GetNextTargetRequired(const CBlockIndex *pindexLast, bool fProofOf
   bnNew /= ((nInterval + 1) * nTargetSpacing);
 
   //we can't make it too easy
-  if(bnNew <= 0 || bnNew > bnProofOfWorkLimit)
-    bnNew = bnProofOfWorkLimit;
+  if(bnNew > bnTargetLimit)
+    bnNew = bnTargetLimit;
 
   return bnNew.GetCompact();
 }
@@ -1078,7 +1110,7 @@ static u32int GetNextBurnTargetRequired(const CBlockIndex *pindexLast)
   bnNew = (bnNew * BURN_HARDER_TARGET * BURN_CONSTANT) / pindexBack->nEffectiveBurnCoins;
 
   //we can't make it too easy
-  if(bnNew <= 0 || bnNew > bnProofOfBurnLimit)
+  if(bnNew > bnProofOfBurnLimit)
     bnNew = bnProofOfBurnLimit;
   
   return bnNew.GetCompact();
@@ -1994,6 +2026,12 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //
 //GetProofOfBurnReward() uses GetPoWReward inside
 //
+//Make the trust of PoW blocks not 1, copy Novacoins code and make slight modifications for PoB blocks
+// change timestamps for CHAINCHECKS and TARGET diff both found at the bottom of patches in main.h
+//
+//Besure to check in CBlockIndex::GetBlockTrust, if CBigNum nPoWTrust = CBigNum(nPoWBase) / (bnTarget + 1); 
+// can be less than 1
+//
 
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -2261,6 +2299,89 @@ bool CBlock::AcceptBlock()
   return true;
 }
 
+CBigNum CBlockIndex::GetBlockTrust() const
+{
+  CBigNum bnTarget;
+  bnTarget.SetCompact(nBits);
+
+  if(bnTarget <= 0)
+    return 0;
+
+  /* Old protocol */
+  if(!fTestNet && GetBlockTime() < CHAINCHECKS_SWITCH_TIME)
+    return (IsProofOfStake() ? (CBigNum(1) << 256) / (bnTarget + 1) : 1);
+
+  /* New protocol */
+
+  // Calculate work amount for block
+  CBigNum nPoWTrust = CBigNum(nPoWBase) / (bnTarget + 1);
+
+  // Set nPowTrust to 1 if we are checking PoS block or PoW difficulty is too low
+  nPoWTrust = (IsProofOfStake() || nPoWTrust < 1) ? 1 : nPoWTrust;
+
+  // Return nPoWTrust for the first 12 blocks
+  if(pprev == NULL || pprev->nHeight < 12)
+    return nPoWTrust;
+
+  const CBlockIndex* currentIndex = pprev;
+
+  if(IsProofOfStake())
+  {
+    CBigNum bnNewTrust = (CBigNum(1)<<256) / (bnTarget+1);
+
+    // Return 1/3 of score if parent block is not the PoW block
+    if(!pprev->IsProofOfWork())
+      return bnNewTrust / 3;
+
+    int nPoWCount = 0;
+
+    // Check last 12 blocks type
+    while (pprev->nHeight - currentIndex->nHeight < 12)
+    {
+      if(currentIndex->IsProofOfWork())
+        nPoWCount++;
+      currentIndex = currentIndex->pprev;
+    }
+
+    // Return 1/3 of score if less than 3 PoW blocks found
+    if (nPoWCount < 3)
+      return bnNewTrust / 3;
+
+    return bnNewTrust;
+  }else{
+    CBigNum bnLastBlockTrust = CBigNum(pprev->bnChainTrust - pprev->pprev->bnChainTrust);
+
+    // Return nPoWTrust + 2/3 of previous block score if two parent blocks are not PoS blocks
+    if (!(pprev->IsProofOfStake() && pprev->pprev->IsProofOfStake()))
+      return nPoWTrust + (2 * bnLastBlockTrust / 3);
+
+    int nPoSCount = 0;
+
+    // Check last 12 blocks type
+    while(pprev->nHeight - currentIndex->nHeight < 12)
+    {
+      if (currentIndex->IsProofOfStake())
+        nPoSCount++;
+      currentIndex = currentIndex->pprev;
+    }
+
+    // Return nPoWTrust + 2/3 of previous block score if less than 7 PoS blocks found
+    if(nPoSCount < 7)
+      return nPoWTrust + (2 * bnLastBlockTrust / 3);
+
+    bnTarget.SetCompact(IsProofOfBurn() ? pprev->nBurnBits : pprev->nBits);
+
+    if(bnTarget <= 0)
+      return 0;
+
+    CBigNum bnNewTrust = (CBigNum(1) << 256) / (bnTarget + 1);
+
+    // Return nPoWTrust + full trust score for previous block nBits or nBurnBits
+    return nPoWTrust + bnNewTrust;
+  }
+}
+
+
 bool ProcessBlock(CNode *pfrom, CBlock *pblock)
 {
   // Check for duplicate
@@ -2337,7 +2458,12 @@ bool ProcessBlock(CNode *pfrom, CBlock *pblock)
     CBigNum bnNewBlock;
     bnNewBlock.SetCompact(pblock->nBits);
     CBigNum bnRequired;
-    bnRequired.SetCompact(ComputeMinWork(GetLastBlockIndex(pcheckpoint, pblock->IsProofOfStake())->nBits, deltaTime));
+
+    if(pblock->IsProofOfStake())
+      bnRequired.SetCompact(
+        ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblock->nTime));
+    else
+      bnRequired.SetCompact(ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
 
     if(bnNewBlock > bnRequired)
     {
