@@ -37,7 +37,7 @@ map<uint256, CBlockIndex*> mapBlockIndex;
 uint256 hashGenesisBlock = hashGenesisBlockOfficial;
 static CBigNum bnProofOfWorkLimit(~uint256(0) >> 20); //5 preceding 0s, 20/4 since every hex = 4 bits
 static CBigNum bnProofOfBurnLimit(~uint256(0) >> 16); //4 preceding 0s, 16/4 since every hex = 4 bits
-static CBigNum bnProofOfStakeLimit(~uint256(0) >> 27); //0x0000001ffff....fff
+static CBigNum bnProofOfStakeLimit(~uint256(0) >> 30); //0x00000003fffff....fff
 static CBigNum bnInitialHashTarget(~uint256(0) >> 21); //0x000007fffff....fff
 static uint256 nPoWBase(~uint256(0) >> 24); //6 preceding 0s, 24/4 since every hex = 4 bits
 unsigned int nStakeMinAge = STAKE_MIN_AGE;
@@ -961,9 +961,9 @@ int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn)
 }
 
 // slimcoin: miner's coin stake is rewarded based on coin age spent (coin-days)
-int64 GetProofOfStakeReward(int64 nCoinAge)
+int64 GetProofOfStakeReward(int64 nCoinAge, u32int nTime)
 {
-  static int64 nRewardCoinYear = CENT;  // creation amount per coin-year
+  int64 nRewardCoinYear = nTime > POB_POS_TARGET_SWITCH_TIME ? (10 * CENT) : CENT;  // creation amount per coin-year
   int64 nSubsidy = nCoinAge * nRewardCoinYear * 33 / (365 * 33 + 8);
 
   if(fDebug && GetBoolArg("-printcreation"))
@@ -996,7 +996,7 @@ static const int64 nTargetSpacingWorkMax = 10 * STAKE_TARGET_SPACING; // 15 minu
 // select stake target limit according to hard-coded conditions
 static inline CBigNum GetProofOfStakeLimit(u32int nTime)
 {
-  if(nTime > TARGETS_SWITCH_TIME)
+  if(nTime > POB_POS_TARGET_SWITCH_TIME)
     return bnProofOfStakeLimit;
 
   return bnProofOfWorkLimit; // return bnProofOfWorkLimit of none matched
@@ -1419,7 +1419,8 @@ unsigned int CTransaction::GetP2SHSigOpCount(const MapPrevTx& inputs) const
 
 bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs,
                                  map<uint256, CTxIndex>& mapTestPool, const CDiskTxPos& posThisTx,
-                                 const CBlockIndex* pindexBlock, bool fBlock, bool fMiner, bool fStrictPayToScriptHash)
+                                 const CBlockIndex* pindexBlock, bool fBlock, 
+                                 bool fMiner, bool fStrictPayToScriptHash)
 {
   // Take over previous transactions' spent pointers
   // fBlock is true when this is called from AcceptBlock when a new best-block is added to the blockchain
@@ -1505,7 +1506,7 @@ bool CTransaction::ConnectInputs(CTxDB& txdb, MapPrevTx inputs,
       if(!GetCoinAge(txdb, nCoinAge))
         return error("ConnectInputs() : %s unable to get coin age for coinstake", GetHash().ToString().substr(0,10).c_str());
       int64 nStakeReward = GetValueOut() - nValueIn;
-      if(nStakeReward > GetProofOfStakeReward(nCoinAge) - GetMinFee() + MIN_TX_FEE)
+      if(nStakeReward > GetProofOfStakeReward(nCoinAge, nTime) - GetMinFee() + MIN_TX_FEE)
         return DoS(100, error("ConnectInputs() : %s stake reward exceeded", GetHash().ToString().substr(0,10).c_str()));
     }
     else
@@ -2029,9 +2030,6 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 //Make the trust of PoW blocks not 1, copy Novacoins code and make slight modifications for PoB blocks
 // change timestamps for CHAINCHECKS and TARGET diff both found at the bottom of patches in main.h
 //
-//Besure to check in CBlockIndex::GetBlockTrust, if CBigNum nPoWTrust = CBigNum(nPoWBase) / (bnTarget + 1); 
-// can be less than 1
-//
 
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
@@ -2360,7 +2358,7 @@ CBigNum CBlockIndex::GetBlockTrust() const
     // Check last 12 blocks type
     while(pprev->nHeight - currentIndex->nHeight < 12)
     {
-      if (currentIndex->IsProofOfStake())
+      if(currentIndex->IsProofOfStake())
         nPoSCount++;
       currentIndex = currentIndex->pprev;
     }

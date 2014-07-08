@@ -146,10 +146,10 @@ inline bool use_burn_hash_intermediate(s32int nHeight)
 }
 
 //Adjusts the trust values for PoW and PoB blocks
-#define CHAINCHECKS_SWITCH_TIME 2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
+#define CHAINCHECKS_SWITCH_TIME          2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
 
-//Adjusts PoS targets
-#define TARGETS_SWITCH_TIME     2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
+//Adjusts PoB and PoS targets
+#define POB_POS_TARGET_SWITCH_TIME       2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
 
 //ADDED PATCHES
 
@@ -241,7 +241,7 @@ bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
 bool CheckProofOfWork(uint256 hash, u32int nBits);
 bool CheckProofOfBurnHash(uint256 hash, u32int nBurnBits);
 int64 GetProofOfWorkReward(u32int nBits, bool fProofOfBurn=false);
-int64 GetProofOfStakeReward(int64 nCoinAge);
+int64 GetProofOfStakeReward(int64 nCoinAge, u32int nTime);
 unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);
 int GetNumBlocksOfPeers();
 bool IsInitialBlockDownload();

@@ -2872,7 +2872,7 @@ static const CRPCCommand vRPCCommands[] =
   { "getblockhash",             &getblockhash,           false  },
   { "gettransaction",           &gettransaction,         false  },
   { "listtransactions",         &listtransactions,       false  },
-  { "listburnminted",           &listburnminted,         false  },
+  { "listburxnminted",           &listburnminted,         false  },
   { "signmessage",              &signmessage,            false  },
   { "verifymessage",            &verifymessage,          false  },
   { "getwork",                  &getwork,                true   },
