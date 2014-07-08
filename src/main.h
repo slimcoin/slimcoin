@@ -146,10 +146,10 @@ inline bool use_burn_hash_intermediate(s32int nHeight)
 }
 
 //Adjusts the trust values for PoW and PoB blocks
-#define CHAINCHECKS_SWITCH_TIME          2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
+#define CHAINCHECKS_SWITCH_TIME          2403654400 //Sometime in the future
 
 //Adjusts PoB and PoS targets
-#define POB_POS_TARGET_SWITCH_TIME       2403654400 //Wed, 25 Jun 2014 00:00:00 GMT
+#define POB_POS_TARGET_SWITCH_TIME       2403654400 //Sometime in the future
 
 //ADDED PATCHES
 
@@ -246,6 +246,7 @@ unsigned int ComputeMinWork(unsigned int nBase, int64 nTime);
 int GetNumBlocksOfPeers();
 bool IsInitialBlockDownload();
 std::string GetWarnings(std::string strFor);
+bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock);
 uint256 WantedByOrphan(const CBlock* pblockOrphan);
 const CBlockIndex* GetLastBlockIndex(const CBlockIndex* pindex, bool fProofOfStake);
 void SlimCoinMiner(CWallet *pwallet, bool fProofOfStake);
@@ -1584,9 +1585,9 @@ public:
 
   bool CheckIndex() const
   {
-    printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
+    /*printf("%5d ------------------------------- %d %d %d %d %d %d %d\n",
            nHeight, IsProofOfWork(), IsProofOfBurn(), IsProofOfStake(), 
-           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);
+           fProofOfBurn, burnBlkHeight, burnCTx, burnCTxOut);*/
 
     //The burn and stake data will be checked after all block indexes have been loaded
 
@@ -1722,6 +1723,9 @@ public:
 /** Used to marshal pointers into hashes for db storage. */
 class CDiskBlockIndex : public CBlockIndex
 {
+private:
+  uint256 blockHash;
+
 public:
   uint256 hashPrev;
   uint256 hashNext;
@@ -1730,6 +1734,8 @@ public:
   {
     hashPrev = 0;
     hashNext = 0;
+    blockHash = 0;
+
   }
 
   explicit CDiskBlockIndex(CBlockIndex* pindex) : CBlockIndex(*pindex)
@@ -1780,10 +1786,16 @@ public:
       READWRITE(burnCTxOut);
       READWRITE(nEffectiveBurnCoins);
       READWRITE(nBurnBits);
+
+      //cached hash of the block
+      READWRITE(blockHash);
       )
 
     uint256 GetBlockHash() const
   {
+    if(fUseFastIndex && (nTime < GetAdjustedTime() - 24 * 60 * 60) && blockHash != 0)
+      return blockHash;
+
     CBlock block;
     block.nVersion        = nVersion;
     block.hashPrevBlock   = hashPrev;
@@ -1791,7 +1803,11 @@ public:
     block.nTime           = nTime;
     block.nBits           = nBits;
     block.nNonce          = nNonce;
-    return block.GetHash();
+
+    //assign the cached value to be written a value
+    const_cast<CDiskBlockIndex*>(this)->blockHash = block.GetHash();
+
+    return blockHash;
   }
 
 

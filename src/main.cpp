@@ -114,8 +114,35 @@ bool static IsFromMe(CTransaction& tx)
 bool static GetTransaction(const uint256& hashTx, CWalletTx& wtx)
 {
   BOOST_FOREACH(CWallet* pwallet, setpwalletRegistered)
-    if(pwallet->GetTransaction(hashTx,wtx))
+    if(pwallet->GetTransaction(hashTx, wtx))
       return true;
+  return false;
+}
+
+// Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock
+bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock)
+{
+  {
+    LOCK(cs_main);
+    {
+      LOCK(mempool.cs);
+      if(mempool.exists(hash))
+      {
+        tx = mempool.lookup(hash);
+        return true;
+      }
+    }
+
+    CTxDB txdb("r");
+    CTxIndex txindex;
+    if (tx.ReadFromDisk(txdb, COutPoint(hash, 0), txindex))
+    {
+      CBlock block;
+      if (block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
+        hashBlock = block.GetHash();
+      return true;
+    }
+  }
   return false;
 }
 
@@ -2601,7 +2628,10 @@ bool CBlock::SignBlock(const CKeyStore &keystore)
 // slimcoin: check block signature
 bool CBlock::CheckBlockSignature() const
 {
-  if(GetHash() == hashGenesisBlock)
+  //if it is the genesis block, first checks if the prev block's hash is 0 since
+  // it should only be that for the genesis block, then check the actual hash,
+  // that is done because checking the actual hash is very intensive
+  if(hashPrevBlock == 0 && GetHash() == hashGenesisBlock)
     return vchBlockSig.empty();
 
   vector<valtype> vSolutions;
