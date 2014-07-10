@@ -917,6 +917,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
   if(mapArgs.count("-datadir")) 
   {
     path = fs::system_complete(mapArgs["-datadir"]);
+
     if(!fs::is_directory(path))
     {
       path = "";

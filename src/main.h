@@ -54,6 +54,7 @@ static const int COINBASE_MATURITY_SLM = 500;
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
 static const int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
 static const int STAKE_TARGET_SPACING = 90; // 90 second block spacing 
+static const int POB_TARGET_SPACING = 3;    // 3 PoW block spacing target between each PoB block
 static const int STAKE_MIN_AGE = 60 * 60 * 24 * 7; // minimum age for coin age
 static const int STAKE_MAX_AGE = 60 * 60 * 24 * 90; // stake age of full weight
 
@@ -64,7 +65,7 @@ static const int fHaveUPnP = false;
 #endif
 
 static const uint256 hashGenesisBlockOfficial("0x00000766be5a4bb74c040b85a98d2ba2b433c5f4c673912b3331ea6f18d61bea");
-static const uint256 hashGenesisBlockTestNet("0x0000340e7843564f3591c67325512c05d48e468285aa1f1df76353ff61462743");
+static const uint256 hashGenesisBlockTestNet("0x00000d7e8a80fec4057cb6d560822705596040bf41f0ebb2465dcdf46e4c517e");
 
 static const int64 nMaxClockDrift = 2 * 60 * 60;        // two hours
 
@@ -130,7 +131,7 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 #error BURN_MIN_CONFIRMS must be greater than or equal to 1
 #endif
 
-//ADDED PATCHES
+//PATCHES
 
 //Rounds down the burn hash for all hashes after block 10500, not really needed though
 // has became a legacy thing
@@ -151,7 +152,7 @@ inline bool use_burn_hash_intermediate(s32int nHeight)
 //Adjusts PoB and PoS targets
 #define POB_POS_TARGET_SWITCH_TIME       2403654400 //Sometime in the future
 
-//ADDED PATCHES
+//PATCHES
 
 void SlimCoinAfterBurner(CWallet *pwallet);
 bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,
@@ -224,6 +225,7 @@ class CTxIndex;
 
 void RegisterWallet(CWallet* pwalletIn);
 void UnregisterWallet(CWallet* pwalletIn);
+void SyncWithWallets(const CTransaction& tx, const CBlock* pblock=NULL, bool fUpdate=false, bool fConnect=true);
 bool ProcessBlock(CNode* pfrom, CBlock* pblock);
 bool CheckDiskSpace(uint64 nAdditionalBytes=0);
 FILE* OpenBlockFile(unsigned int nFile, unsigned int nBlockPos, const char* pszMode="rb");

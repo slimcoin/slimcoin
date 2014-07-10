@@ -25,6 +25,7 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/asio/ssl.hpp> 
 #include <boost/filesystem/fstream.hpp>
+#include <boost/assign/list_of.hpp>
 typedef boost::asio::ssl::stream<boost::asio::ip::tcp::socket> SSLStream;
 
 #define printf OutputDebugStringF
@@ -95,6 +96,41 @@ double GetDifficulty(const CBlockIndex* blockindex = NULL)
   return dDiff;
 }
 
+void RPCTypeCheck(const Array& params, const list<Value_type>& typesExpected, bool fAllowNull)
+{
+  unsigned int i = 0;
+  BOOST_FOREACH(Value_type t, typesExpected)
+  {
+    if (params.size() <= i)
+      break;
+
+    const Value& v = params[i];
+    if (!((v.type() == t) || (fAllowNull && (v.type() == null_type))))
+    {
+      string err = strprintf("Expected type %s, got %s",
+                             Value_type_name[t], Value_type_name[v.type()]);
+      throw JSONRPCError(RPC_TYPE_ERROR, err);
+    }
+    i++;
+  }
+}
+
+void RPCTypeCheck(const Object& o, const map<string, Value_type>& typesExpected, bool fAllowNull)
+{
+  BOOST_FOREACH(const PAIRTYPE(string, Value_type)& t, typesExpected)
+  {
+    const Value& v = find_value(o, t.first);
+    if (!fAllowNull && v.type() == null_type)
+      throw JSONRPCError(RPC_TYPE_ERROR, strprintf("Missing %s", t.first.c_str()));
+
+    if (!((v.type() == t.second) || (fAllowNull && (v.type() == null_type))))
+    {
+      string err = strprintf("Expected type %s for %s, got %s",
+                             Value_type_name[t.second], t.first.c_str(), Value_type_name[v.type()]);
+      throw JSONRPCError(RPC_TYPE_ERROR, err);
+    }
+  }
+}
 
 int64 AmountFromValue(const Value& value)
 {
@@ -159,15 +195,54 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
   result.push_back(Pair("bits", HexBits(block.nBits)));
   result.push_back(Pair("difficulty", GetDifficulty(blockindex)));
   result.push_back(Pair("mint", ValueFromAmount(blockindex->nMint)));
+
   if(blockindex->pprev)
     result.push_back(Pair("previousblockhash", blockindex->pprev->GetBlockHash().GetHex()));
+
   if(blockindex->pnext)
     result.push_back(Pair("nextblockhash", blockindex->pnext->GetBlockHash().GetHex()));
-  result.push_back(Pair("flags", strprintf("%s%s", blockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work", blockindex->GeneratedStakeModifier()? " stake-modifier": "")));
-  result.push_back(Pair("proofhash", blockindex->IsProofOfStake()? blockindex->hashProofOfStake.GetHex() : blockindex->GetBlockHash().GetHex()));
+
+  {
+    string flags, proofhash;
+
+    if(blockindex->IsProofOfBurn())
+    {
+      flags += "proof-of-burn";
+
+      result.push_back(Pair("Intermediate PoB hash", blockindex->burnHash.GetHex()));
+      proofhash += block.GetBurnHash(false).GetHex();
+    }else if(blockindex->IsProofOfStake())
+    {
+      flags += "proof-of-stake";
+      flags += blockindex->GeneratedStakeModifier() ? " stake-modifier": "";
+
+      proofhash += blockindex->hashProofOfStake.GetHex();
+    }else{ //IsProofOfWork()
+      flags += "proof-of-work";
+
+      proofhash += blockindex->GetBlockHash().GetHex();
+    }
+  
+    result.push_back(Pair("flags", flags));
+    result.push_back(Pair("proofhash", proofhash));
+  }
+
   result.push_back(Pair("entropybit", (int)blockindex->GetStakeEntropyBit()));
   result.push_back(Pair("modifier", strprintf("%016"PRI64x, blockindex->nStakeModifier)));
   result.push_back(Pair("modifierchecksum", strprintf("%08x", blockindex->nStakeModifierChecksum)));
+
+  //PoB details
+  if(blockindex->IsProofOfBurn())
+  {
+    result.push_back(Pair("burnBlkHeight", blockindex->burnBlkHeight));
+    result.push_back(Pair("burnCTx", blockindex->burnCTx));
+    result.push_back(Pair("burnCTxOut", blockindex->burnCTxOut));
+  }
+
+  result.push_back(Pair("nEffectiveBurnCoins", strprintf("%"PRI64d, blockindex->nEffectiveBurnCoins)));
+  result.push_back(Pair("Formatted nEffectiveBurnCoins", FormatMoney(blockindex->nEffectiveBurnCoins)));
+  result.push_back(Pair("nBurnBits", HexBits(blockindex->nBurnBits)));
+
   Array txinfo;
   BOOST_FOREACH (const CTransaction& tx, block.vtx)
   {
@@ -187,6 +262,22 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPri
   return result;
 }
 
+string HelpRequiringPassphrase()
+{
+  return pwalletMain->IsCrypted()
+    ? "requires wallet passphrase to be set with walletpassphrase first"
+    : "";
+}
+
+void EnsureWalletIsUnlocked()
+{
+  if(pwalletMain->IsLocked())
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, 
+                       "Error: Please enter the wallet passphrase with walletpassphrase first.");
+
+  if(fWalletUnlockMintOnly)
+    throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED, "Error: Wallet is unlocked for Proof of Stake only.");
+}
 
 
 ///
@@ -661,15 +752,11 @@ Value settxfee(const Array& params, bool fHelp)
 
 Value sendtoaddress(const Array& params, bool fHelp)
 {
-  if(pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 4))
+  if(fHelp || params.size() < 2 || params.size() > 4)
     throw runtime_error(
       "sendtoaddress <slimcoinaddress> <amount> [comment] [comment-to]\n"
       "<amount> is a real and is rounded to the nearest 0.000001\n"
-      "requires wallet passphrase to be set with walletpassphrase first");
-  if(!pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 4))
-    throw runtime_error(
-      "sendtoaddress <slimcoinaddress> <amount> [comment] [comment-to]\n"
-      "<amount> is a real and is rounded to the nearest 0.000001");
+      + HelpRequiringPassphrase());
 
   CBitcoinAddress address(params[0].get_str());
   if(!address.IsValid())
@@ -1038,15 +1125,11 @@ Value calcburnhash(const Array &params, bool fHelp)
 
 Value burncoins(const Array &params, bool fHelp)
 {
-  if(pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 5))
+  if(fHelp || params.size() < 2 || params.size() > 5)
     throw runtime_error(
       "burncoins <fromaccount> <amount> [minconf=1] [comment] [comment-to]\n"
       "<amount> is a real and is rounded to the nearest 0.000001\n"
-      "requires wallet passphrase to be set with walletpassphrase first");
-  if(!pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 5))
-    throw runtime_error(
-      "burncoins <fromaccount> <amount> [minconf=1] [comment] [comment-to]\n"
-      "<amount> is a real and is rounded to the nearest 0.000001");
+      + HelpRequiringPassphrase());
 
   string strAccount = AccountFromValue(params[0]);
   
@@ -1149,7 +1232,7 @@ Value getburndata(const Array &params, bool fHelp)
   Object info;
   info.push_back(Pair("General Info", ""));
   info.push_back(Pair("nBurnBits", strprintf("%08x", pindexBest->nBurnBits)));
-  info.push_back(Pair("nEffectiveBurnCoins", strprintf("%"PRI64u, pindexBest->nEffectiveBurnCoins)));
+  info.push_back(Pair("nEffectiveBurnCoins", strprintf("%"PRI64d, pindexBest->nEffectiveBurnCoins)));
   info.push_back(Pair("Formatted nEffectiveBurnCoins", FormatMoney(pindexBest->nEffectiveBurnCoins)));
                  
   ret.push_back(info);
@@ -1159,15 +1242,11 @@ Value getburndata(const Array &params, bool fHelp)
 
 Value sendfrom(const Array &params, bool fHelp)
 {
-  if(pwalletMain->IsCrypted() && (fHelp || params.size() < 3 || params.size() > 6))
+  if(fHelp || params.size() < 3 || params.size() > 6)
     throw runtime_error(
       "sendfrom <fromaccount> <toslimcoinaddress> <amount> [minconf=1] [comment] [comment-to]\n"
       "<amount> is a real and is rounded to the nearest 0.000001\n"
-      "requires wallet passphrase to be set with walletpassphrase first");
-  if(!pwalletMain->IsCrypted() && (fHelp || params.size() < 3 || params.size() > 6))
-    throw runtime_error(
-      "sendfrom <fromaccount> <toslimcoinaddress> <amount> [minconf=1] [comment] [comment-to]\n"
-      "<amount> is a real and is rounded to the nearest 0.000001");
+      + HelpRequiringPassphrase());
 
   string strAccount = AccountFromValue(params[0]);
   CBitcoinAddress address(params[1].get_str());
@@ -1215,15 +1294,11 @@ Value sendfrom(const Array &params, bool fHelp)
 
 Value sendmany(const Array& params, bool fHelp)
 {
-  if(pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 4))
+  if(fHelp || params.size() < 2 || params.size() > 4)
     throw runtime_error(
       "sendmany <fromaccount> {address:amount,...} [minconf=1] [comment]\n"
       "amounts are double-precision floating point numbers\n"
-      "requires wallet passphrase to be set with walletpassphrase first");
-  if(!pwalletMain->IsCrypted() && (fHelp || params.size() < 2 || params.size() > 4))
-    throw runtime_error(
-      "sendmany <fromaccount> {address:amount,...} [minconf=1] [comment]\n"
-      "amounts are double-precision floating point numbers");
+      + HelpRequiringPassphrase());
 
   string strAccount = AccountFromValue(params[0]);
   Object sendTo = params[1].get_obj();
@@ -1911,6 +1986,12 @@ Value gettransaction(const Array& params, bool fHelp)
   return entry;
 }
 
+
+//
+//Raw Txns
+//
+
+
 void ScriptPubKeyToJSON(const CScript& scriptPubKey, Object& out, bool fIncludeHex)
 {
   txnouttype type;
@@ -2031,6 +2112,254 @@ Value getrawtransaction(const Array& params, bool fHelp)
   return result;
 }
 
+Value sendrawtransaction(const Array& params, bool fHelp)
+{
+  if (fHelp || params.size() < 1 || params.size() > 1)
+    throw runtime_error(
+      "sendrawtransaction <hex string>\n"
+      "Submits raw transaction (serialized, hex-encoded) to local node and network.");
+
+  RPCTypeCheck(params, boost::assign::list_of(str_type));
+
+  // parse hex string from parameter
+  vector<unsigned char> txData(ParseHex(params[0].get_str()));
+  CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
+  CTransaction tx;
+
+  // deserialize binary data stream
+  try {
+    ssData >> tx;
+  }
+  catch (std::exception &e) {
+    throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+  }
+  uint256 hashTx = tx.GetHash();
+
+  // See if the transaction is already in a block
+  // or in the memory pool:
+  CTransaction existingTx;
+  uint256 hashBlock = 0;
+  if(GetTransaction(hashTx, existingTx, hashBlock))
+  {
+    if(hashBlock != 0)
+      throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("transaction already in block ")+hashBlock.GetHex());
+    // Not in block, but already in the memory pool; will drop
+    // through to re-relay it.
+  }else{
+    CTxDB txdb("r");
+    // push to local node
+    if(!tx.AcceptToMemoryPool(txdb, true, NULL))
+      throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX rejected");
+
+    SyncWithWallets(tx, NULL, true);
+  }
+
+  {
+    //Relay Transaction
+    CInv inv(MSG_TX, hashTx);
+    RelayMessage(inv, tx);
+  }
+
+  return hashTx.GetHex();
+}
+
+Value signrawtransaction(const Array& params, bool fHelp)
+{
+  if(fHelp || params.size() < 1 || params.size() > 4)
+    throw runtime_error(
+      "signrawtransaction <hex string> [{\"txid\":txid,\"vout\":n,\"scriptPubKey\":hex},...] [<privatekey1>,...] [sighashtype=\"ALL\"]\n"
+      "Sign inputs for raw transaction (serialized, hex-encoded).\n"
+      "Second optional argument (may be null) is an array of previous transaction outputs that\n"
+      "this transaction depends on but may not yet be in the blockchain.\n"
+      "Third optional argument (may be null) is an array of base58-encoded private\n"
+      "keys that, if given, will be the only keys used to sign the transaction.\n"
+      "Fourth optional argument is a string that is one of six values; ALL, NONE, SINGLE or\n"
+      "ALL|ANYONECANPAY, NONE|ANYONECANPAY, SINGLE|ANYONECANPAY.\n"
+      "Returns json object with keys:\n"
+      "  hex : raw transaction with signature(s) (hex-encoded string)\n"
+      "  complete : 1 if transaction has a complete set of signature (0 if not)"
+      + HelpRequiringPassphrase());
+
+  RPCTypeCheck(params, boost::assign::list_of(str_type)(array_type)(array_type)(str_type), true);
+
+  vector<unsigned char> txData(ParseHex(params[0].get_str()));
+  CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
+  vector<CTransaction> txVariants;
+  while (!ssData.empty())
+  {
+    try {
+      CTransaction tx;
+      ssData >> tx;
+      txVariants.push_back(tx);
+    }
+    catch (std::exception &e) {
+      throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    }
+  }
+
+  if (txVariants.empty())
+    throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "Missing transaction");
+
+  // mergedTx will end up with all the signatures; it
+  // starts as a clone of the rawtx:
+  CTransaction mergedTx(txVariants[0]);
+  bool fComplete = true;
+
+  // Fetch previous transactions (inputs):
+  map<COutPoint, CScript> mapPrevOut;
+  for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
+  {
+    CTransaction tempTx;
+    MapPrevTx mapPrevTx;
+    CTxDB txdb("r");
+    map<uint256, CTxIndex> unused;
+    bool fInvalid;
+
+    // FetchInputs aborts on failure, so we go one at a time.
+    tempTx.vin.push_back(mergedTx.vin[i]);
+    tempTx.FetchInputs(txdb, unused, false, false, mapPrevTx, fInvalid);
+
+    // Copy results into mapPrevOut:
+    BOOST_FOREACH(const CTxIn& txin, tempTx.vin)
+    {
+      const uint256& prevHash = txin.prevout.hash;
+      if (mapPrevTx.count(prevHash) && mapPrevTx[prevHash].second.vout.size()>txin.prevout.n)
+        mapPrevOut[txin.prevout] = mapPrevTx[prevHash].second.vout[txin.prevout.n].scriptPubKey;
+    }
+  }
+
+  // Add previous txouts given in the RPC call:
+  if (params.size() > 1 && params[1].type() != null_type)
+  {
+    Array prevTxs = params[1].get_array();
+    BOOST_FOREACH(Value& p, prevTxs)
+    {
+      if (p.type() != obj_type)
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "expected object with {\"txid'\",\"vout\",\"scriptPubKey\"}");
+
+      Object prevOut = p.get_obj();
+
+      RPCTypeCheck(prevOut, 
+                   boost::assign::map_list_of("txid", str_type)("vout", int_type)("scriptPubKey", str_type));
+
+      string txidHex = find_value(prevOut, "txid").get_str();
+      if (!IsHex(txidHex))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "txid must be hexadecimal");
+      uint256 txid;
+      txid.SetHex(txidHex);
+
+      int nOut = find_value(prevOut, "vout").get_int();
+      if (nOut < 0)
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "vout must be positive");
+
+      string pkHex = find_value(prevOut, "scriptPubKey").get_str();
+      if (!IsHex(pkHex))
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "scriptPubKey must be hexadecimal");
+      vector<unsigned char> pkData(ParseHex(pkHex));
+      CScript scriptPubKey(pkData.begin(), pkData.end());
+
+      COutPoint outpoint(txid, nOut);
+      if (mapPrevOut.count(outpoint))
+      {
+        // Complain if scriptPubKey doesn't match
+        if (mapPrevOut[outpoint] != scriptPubKey)
+        {
+          string err("Previous output scriptPubKey mismatch:\n");
+          err = err + mapPrevOut[outpoint].ToString() + "\nvs:\n"+
+            scriptPubKey.ToString();
+          throw JSONRPCError(RPC_DESERIALIZATION_ERROR, err);
+        }
+      }
+      else
+        mapPrevOut[outpoint] = scriptPubKey;
+    }
+  }
+
+  bool fGivenKeys = false;
+  CBasicKeyStore tempKeystore;
+  if (params.size() > 2 && params[2].type() != null_type)
+  {
+    fGivenKeys = true;
+    Array keys = params[2].get_array();
+    BOOST_FOREACH(Value k, keys)
+    {
+      CBitcoinSecret vchSecret;
+      bool fGood = vchSecret.SetString(k.get_str());
+      if (!fGood)
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY,"Invalid private key");
+      CKey key;
+      bool fCompressed;
+      CSecret secret = vchSecret.GetSecret(fCompressed);
+      key.SetSecret(secret, fCompressed);
+      tempKeystore.AddKey(key);
+    }
+  }
+  else
+    EnsureWalletIsUnlocked();
+
+  const CKeyStore& keystore = (fGivenKeys ? tempKeystore : *pwalletMain);
+
+  int nHashType = SIGHASH_ALL;
+  if (params.size() > 3 && params[3].type() != null_type)
+  {
+    static map<string, int> mapSigHashValues =
+      boost::assign::map_list_of
+      (string("ALL"), int(SIGHASH_ALL))
+      (string("ALL|ANYONECANPAY"), int(SIGHASH_ALL|SIGHASH_ANYONECANPAY))
+      (string("NONE"), int(SIGHASH_NONE))
+      (string("NONE|ANYONECANPAY"), int(SIGHASH_NONE|SIGHASH_ANYONECANPAY))
+      (string("SINGLE"), int(SIGHASH_SINGLE))
+      (string("SINGLE|ANYONECANPAY"), int(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY))
+      ;
+    string strHashType = params[3].get_str();
+    if (mapSigHashValues.count(strHashType))
+      nHashType = mapSigHashValues[strHashType];
+    else
+      throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
+  }
+
+  bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
+
+  // Sign what we can:
+  for (unsigned int i = 0; i < mergedTx.vin.size(); i++)
+  {
+    CTxIn& txin = mergedTx.vin[i];
+    if (mapPrevOut.count(txin.prevout) == 0)
+    {
+      fComplete = false;
+      continue;
+    }
+    const CScript& prevPubKey = mapPrevOut[txin.prevout];
+
+    txin.scriptSig.clear();
+    // Only sign SIGHASH_SINGLE if there's a corresponding output:
+    if(!fHashSingle || (i < mergedTx.vout.size()))
+      SignSignature(keystore, prevPubKey, mergedTx, i, nHashType);
+
+    // ... and merge in other signatures:
+    BOOST_FOREACH(const CTransaction& txv, txVariants)
+    {
+      txin.scriptSig = CombineSignatures(prevPubKey, mergedTx, i, txin.scriptSig, txv.vin[i].scriptSig);
+    }
+    if (!VerifyScript(txin.scriptSig, prevPubKey, mergedTx, i, true, 0))
+      fComplete = false;
+  }
+
+  Object result;
+  CDataStream ssTx(SER_NETWORK, PROTOCOL_VERSION);
+  ssTx << mergedTx;
+  result.push_back(Pair("hex", HexStr(ssTx.begin(), ssTx.end())));
+  result.push_back(Pair("complete", fComplete));
+
+  return result;
+}
+
+
+//
+//Raw Txns
+//
+
+
 Value backupwallet(const Array& params, bool fHelp)
 {
   if(fHelp || params.size() != 1)
@@ -2047,14 +2376,10 @@ Value backupwallet(const Array& params, bool fHelp)
 
 Value keypoolrefill(const Array& params, bool fHelp)
 {
-  if(pwalletMain->IsCrypted() && (fHelp || params.size() > 0))
+  if(fHelp || params.size() > 0)
     throw runtime_error(
       "keypoolrefill\n"
-      "Fills the keypool, requires wallet passphrase to be set.");
-  if(!pwalletMain->IsCrypted() && (fHelp || params.size() > 0))
-    throw runtime_error(
-      "keypoolrefill\n"
-      "Fills the keypool.");
+      "Fills the keypool, " + HelpRequiringPassphrase());
 
   if(pwalletMain->IsLocked())
     throw JSONRPCError(RPC_WALLET_UNLOCK_NEEDED,
@@ -3004,6 +3329,8 @@ static const CRPCCommand vRPCCommands[] =
   { "dumpprivkey",              &dumpprivkey,            false  },
   { "importprivkey",            &importprivkey,          false  },
   { "getrawtransaction",        &getrawtransaction,      false  },
+  { "sendrawtransaction",       &sendrawtransaction,     false  },
+  { "signrawtransaction",       &signrawtransaction,     false  },
   { "getcheckpoint",            &getcheckpoint,          true   },
   { "reservebalance",           &reservebalance,         false  },
   { "checkwallet",              &checkwallet,            false  },
@@ -3579,18 +3906,24 @@ Object CallRPC(const string& strMethod, const Array& params)
 
 
 template<typename T>
-void ConvertTo(Value& value)
+void ConvertTo(Value& value, bool fAllowNull=false)
 {
+  if(fAllowNull && value.type() == null_type)
+    return;
+
   if(value.type() == str_type)
   {
     // reinterpret string as unquoted json value
     Value value2;
-    if(!read_string(value.get_str(), value2))
-      throw runtime_error("type mismatch");
-    value = value2.get_value<T>();
-  }
-  else
-  {
+    string strJSON = value.get_str();
+
+    if(!read_string(strJSON, value2))
+      throw runtime_error(string("Error parsing JSON:") + strJSON);
+
+    ConvertTo<T>(value2, fAllowNull);
+    value = value2;
+
+  }else{
     value = value.get_value<T>();
   }
 }
@@ -3664,7 +3997,9 @@ Array RPCConvertValues(const std::string &strMethod, const std::vector<std::stri
     params[1] = v.get_array();
   }
   
-  FORMAT_PARAM("getrawtransaction", 1, boost::int64_t);
+  FORMAT_PARAM("getrawtransaction",  1, boost::int64_t);
+  if(strMethod == "signrawtransaction"     && n > 1) ConvertTo<Array>(params[1], true);
+  if(strMethod == "signrawtransaction"     && n > 2) ConvertTo<Array>(params[2], true);
 
   return params;
 }
