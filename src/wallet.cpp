@@ -1293,6 +1293,7 @@ bool CWallet::CreateCoinStake(const CKeyStore &keystore, unsigned int nBits,
     CBlock block;
     if(!block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
       continue;
+
     static int nMaxStakeSearchInterval = 60;
     if(block.GetBlockTime() + nStakeMinAge > txNew.nTime - nMaxStakeSearchInterval)
       continue; // only count coins meeting min age requirement

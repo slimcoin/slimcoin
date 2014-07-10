@@ -487,7 +487,7 @@ void CNode::copyStats(CNodeStats &stats)
 
 
 void ThreadSocketHandler(void* parg)
-{
+{ 
   IMPLEMENT_RANDOMIZE_STACK(ThreadSocketHandler(parg));
   try
   {

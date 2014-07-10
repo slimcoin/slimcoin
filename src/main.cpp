@@ -1006,7 +1006,7 @@ int64 GetProofOfBurnReward(u32int nBurnBits)
   return GetProofOfWorkReward(nBurnBits, true);
 }
 
-//Target time span for PoB is 30 PoW blocks
+//Target timespan for PoB is 30 PoW blocks
 static const int64 nPoBTargetTimespan = 30;
 
 static inline int64 getTargetTimespan(s32int lastNHeight)
@@ -2105,7 +2105,9 @@ bool CBlock::GetCoinAge(uint64& nCoinAge) const
 
 //MYTODO: 
 //
-//Empty...
+//Checkout SelectCoins vs SelectCoins simple in the stocastic part
+//
+//Also, do not forget to change timestamps for new update!!
 //
 
 bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
