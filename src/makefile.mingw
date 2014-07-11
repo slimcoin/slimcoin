@@ -9,9 +9,9 @@
 #
 # - Add/edit 'MAKE' environment variable with value '/c/MinGW32/bin/mingw32-make.exe'
 #
-# - Build openssl library version: 1.0.1b
+# - Build openssl library version: 1.0.1h
 #   download from  http://www.openssl.org/source/
-#   Extract to c:\openssl-1.0.1b-mgw
+#   Extract to c:\openssl-1.0.1h-mgw
 #   In MinGW MSYS:
 #     ./config
 #     make
@@ -69,7 +69,7 @@ INCLUDEPATHS= \
 LIBPATHS= \
  -L"C:\boost-1.47.0-mgw\stage\lib" \
  -L"C:\db-4.8.30.NC-mgw\build_unix" \
- -L"C:\openssl-1.0.1b-mgw"
+ -L"C:\openssl-1.0.1h-mgw"
 
 LIBS= \
  -l boost_system-mgw46-mt-s-1_47 \
@@ -119,7 +119,9 @@ OBJS= \
     obj/wallet.o \
     obj/walletdb.o \
     obj/noui.o \
-    obj/kernel.o
+    obj/kernel.o \
+    obj/dcrypt.o \
+    obj/sh256.o
 
 
 all: slimcoind.exe
