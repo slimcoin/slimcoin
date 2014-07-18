@@ -396,7 +396,7 @@ bool CTxDB::ReadOwnerTxes(uint160 hash160, int nMinHeight, vector<CTransaction>&
     return false;
 
   unsigned int fFlags = DB_SET_RANGE;
-  loop
+  while (true)
   {
     // Read next record
     CDataStream ssKey(SER_DISK, CLIENT_VERSION);
