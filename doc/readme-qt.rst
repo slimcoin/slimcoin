@@ -16,6 +16,13 @@ distribution are installed, for Debian and Ubuntu these are:
         libboost-filesystem-dev libboost-program-options-dev libboost-thread-dev \
         libssl-dev libdb4.8++-dev
 
+
+For Qt 5 you need the following, otherwise you get an error with lrelease when running qmake:
+
+::
+
+    apt-get install qt5-qmake libqt5gui5 libqt5core5 libqt5dbus5 qttools5-dev-tools
+
 then execute the following:
 
 ::
