@@ -3522,7 +3522,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         if(mi != mapBlockIndex.end())
         {
           //useful to print the nHeight
-          printf("\tnHeight: %d", mi->second->nHeight);
+          printf("\tnHeight: %d\t", mi->second->nHeight);
 
           CBlock block;
           block.ReadFromDisk((*mi).second);

@@ -147,10 +147,10 @@ inline bool use_burn_hash_intermediate(s32int nHeight)
 }
 
 //Adjusts the trust values for PoW and PoB blocks
-#define CHAINCHECKS_SWITCH_TIME          2403654400 //Sometime in the future
+#define CHAINCHECKS_SWITCH_TIME          2403654400ULL //Sometime in the future
 
 //Adjusts PoB and PoS targets
-#define POB_POS_TARGET_SWITCH_TIME       2403654400 //Sometime in the future
+#define POB_POS_TARGET_SWITCH_TIME       2403654400ULL //Sometime in the future
 
 //PATCHES
 
