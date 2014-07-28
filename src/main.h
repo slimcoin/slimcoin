@@ -139,13 +139,12 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 // has became a legacy thing due to the burn_hash_intermediate
 extern const u32int BURN_ROUND_DOWN;
 
-//at block 15936 and above, when checking burn hash equality in
-// CBlock::CheckProofOfBurn, use the intermediate hash
-#define BURN_INTERMEDIATE_HEIGHT 15936
-
-inline bool use_burn_hash_intermediate(s32int nHeight)
+//at blocks with timestamps greater or equaling 1403247483, when checking burn hash equality in
+// CBlock::CheckProofOfBurn, uses the intermediate hash
+inline bool use_burn_hash_intermediate(u32int nTime)
 {
-  return nHeight >= BURN_INTERMEDIATE_HEIGHT ? true : false;
+  const u32int BURN_INTERMEDIATE_TIME = 1403247483; //Fri, 20 Jun 2014 06:58:03 GMT
+  return nTime >= BURN_INTERMEDIATE_TIME ? true : false;
 }
 
 //Adjusts the trust values for PoW and PoB blocks

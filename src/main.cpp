@@ -57,7 +57,7 @@ int64 nTimeBestReceived = 0;
 
 //Rounds down the burn hash for all hashes after (or equalling) timestamp 1402314985, not really needed though
 // has became a legacy thing due to the burn_hash_intermediate
-const u32int BURN_ROUND_DOWN = 1402314985; //June 9, 2014, 13:56:25
+const u32int BURN_ROUND_DOWN = 1402314985; //Mon, 09 Jun 2014 11:56:25 GMT
 
 //Adjusts the trust values for PoW and PoB blocks
 const uint64 CHAINCHECKS_SWITCH_TIME = 2403654400; //Sometime in the future
@@ -1283,10 +1283,9 @@ bool CBlock::CheckProofOfBurn() const
     return DoS(10, error("CheckProofOfBurn() : hashBurnBlock does not equal the pBurnIndex's block hash"));
 
   //see if this PoB block is past the intermediate burn hash update
-  const bool fUseIntermediate = use_burn_hash_intermediate(pindexPrev->nHeight + 1);
+  const bool fUseIntermediate = use_burn_hash_intermediate(nTime);
 
   //Check proof-of-burn hash matches claimed amount
-  // pindexPrev->nHeight + 1 since use_burn_hash_intermediate works on the height of the current block
   uint256 calculatedBurnHash = GetBurnHash(false);
   uint256 intermediateBurnHash = GetBurnHash(fUseIntermediate);
 
@@ -5287,10 +5286,9 @@ void SlimCoinAfterBurner(CWallet *pwallet)
         smallestWTx.SetBurnTxCoords(pblock->burnBlkHeight, pblock->burnCTx, pblock->burnCTxOut);
 
         //hash it as if it was not our block and test if the hash matches our claimed hash
-        // pindexLastBlock->nHeight + 1 since use_burn_hash_intermediate works on the height of the current block
         uint256 hasher;
         GetBurnHash(pblock->hashPrevBlock, pblock->burnBlkHeight, pblock->burnCTx, 
-                    pblock->burnCTxOut, hasher, use_burn_hash_intermediate(pindexLastBlock->nHeight + 1));
+                    pblock->burnCTxOut, hasher, use_burn_hash_intermediate(pblock->nTime));
         
         //if this block's IsProofOfBurn() does not trigger, continue
         if(!pblock->IsProofOfBurn())

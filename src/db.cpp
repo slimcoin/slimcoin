@@ -717,7 +717,7 @@ bool CTxDB::LoadBlockIndex()
          */
 
         //apply the checking of burn hashes if the height is past the burn intermediate hash change in the client
-        const bool fUseIntermediate = use_burn_hash_intermediate(pindex->nHeight);
+        const bool fUseIntermediate = use_burn_hash_intermediate(pindex->nTime);
 
         if(fUseIntermediate)
         {
