@@ -131,7 +131,9 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 #error BURN_MIN_CONFIRMS must be greater than or equal to 1
 #endif
 
+////////////////////////////////
 //PATCHES
+////////////////////////////////
 
 //Rounds down the burn hash for all hashes after block 10500, not really needed though
 // has became a legacy thing
@@ -147,12 +149,14 @@ inline bool use_burn_hash_intermediate(s32int nHeight)
 }
 
 //Adjusts the trust values for PoW and PoB blocks
-#define CHAINCHECKS_SWITCH_TIME          2403654400ULL //Sometime in the future
+extern const uint64 CHAINCHECKS_SWITCH_TIME;
 
 //Adjusts PoB and PoS targets
-#define POB_POS_TARGET_SWITCH_TIME       2403654400ULL //Sometime in the future
+extern const uint64 POB_POS_TARGET_SWITCH_TIME;
 
+////////////////////////////////
 //PATCHES
+////////////////////////////////
 
 void SlimCoinAfterBurner(CWallet *pwallet);
 bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHash,

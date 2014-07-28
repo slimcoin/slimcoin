@@ -51,6 +51,20 @@ uint256 hashBestChain = 0;
 CBlockIndex *pindexBest = NULL;
 int64 nTimeBestReceived = 0;
 
+////////////////////////////////
+//PATCHES
+////////////////////////////////
+
+//Adjusts the trust values for PoW and PoB blocks
+const uint64 CHAINCHECKS_SWITCH_TIME = 2403654400; //Sometime in the future
+
+//Adjusts PoB and PoS targets
+const uint64 POB_POS_TARGET_SWITCH_TIME = 2403654400; //Sometime in the future
+
+////////////////////////////////
+//PATCHES
+////////////////////////////////
+
 CMedianFilter<int> cPeerBlockCounts(5, 0); // Amount of blocks that other nodes claim to have
 
 map<uint256, CBlock*> mapOrphanBlocks;
