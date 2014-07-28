@@ -135,9 +135,9 @@ const CBitcoinAddress burnTestnetAddress("mmSLiMCoinTestnetBurnAddress1XU5fu");
 //PATCHES
 ////////////////////////////////
 
-//Rounds down the burn hash for all hashes after block 10500, not really needed though
-// has became a legacy thing
-#define BURN_ROUND_DOWN 10500
+//Rounds down the burn hash for all hashes after (or equalling) timestamp 1402314985, not really needed though
+// has became a legacy thing due to the burn_hash_intermediate
+extern const u32int BURN_ROUND_DOWN;
 
 //at block 15936 and above, when checking burn hash equality in
 // CBlock::CheckProofOfBurn, use the intermediate hash

@@ -55,6 +55,10 @@ int64 nTimeBestReceived = 0;
 //PATCHES
 ////////////////////////////////
 
+//Rounds down the burn hash for all hashes after (or equalling) timestamp 1402314985, not really needed though
+// has became a legacy thing due to the burn_hash_intermediate
+const u32int BURN_ROUND_DOWN = 1402314985; //June 9, 2014, 13:56:25
+
 //Adjusts the trust values for PoW and PoB blocks
 const uint64 CHAINCHECKS_SWITCH_TIME = 2403654400; //Sometime in the future
 
@@ -4371,6 +4375,7 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
     return error("HashBurnData() : Block hash %s not found in mapBlockIndex", hashPrevBlock.ToString().c_str());
 
   const s32int lastBlkHeight = mapBlockIndex[hashPrevBlock]->nHeight;
+  const u32int lastBlkTime = mapBlockIndex[hashPrevBlock]->nTime;
   const s32int between = nPoWBlocksBetween(burnBlkHeight, lastBlkHeight);
 
   if(between < BURN_MIN_CONFIRMS)
@@ -4410,7 +4415,7 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
       return false;
 
     //assign the final bnTest hash to the smallestHashRet
-    if(lastBlkHeight >= BURN_ROUND_DOWN)
+    if(lastBlkTime >= BURN_ROUND_DOWN)
       smallestHashRet = becomeCompact(bnTest.getuint256());
     else
       smallestHashRet = bnTest.getuint256();
