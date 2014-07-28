@@ -60,10 +60,10 @@ int64 nTimeBestReceived = 0;
 const u32int BURN_ROUND_DOWN = 1402314985; //Mon, 09 Jun 2014 11:56:25 GMT
 
 //Adjusts the trust values for PoW and PoB blocks
-const uint64 CHAINCHECKS_SWITCH_TIME = 2403654400; //Sometime in the future
+const uint64 CHAINCHECKS_SWITCH_TIME = 1407110400; //Mon, 04 Aug 2014 00:00:00 GMT
 
 //Adjusts PoB and PoS targets
-const uint64 POB_POS_TARGET_SWITCH_TIME = 2403654400; //Sometime in the future
+const uint64 POB_POS_TARGET_SWITCH_TIME = 1407110400; //Mon, 04 Aug 2014 00:00:00 GMT
 
 ////////////////////////////////
 //PATCHES
