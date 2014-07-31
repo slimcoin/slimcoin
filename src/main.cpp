@@ -3731,11 +3731,12 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
     CBlock block;
     vRecv >> block;
 
-    printf("received block %s\n", block.GetHash().ToString().substr(0, 20).c_str());
+    const uint256 blockHash = block.GetHash();
+    printf("received block %s\n", blockHash.ToString().substr(0, 20).c_str());
     
-    block.print();
+    block.print(blockHash);
 
-    CInv inv(MSG_BLOCK, block.GetHash());
+    CInv inv(MSG_BLOCK, blockHash);
     pfrom->AddInventoryKnown(inv);
 
     if(ProcessBlock(pfrom, &block))

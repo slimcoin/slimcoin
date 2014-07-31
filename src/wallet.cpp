@@ -1289,13 +1289,13 @@ bool CWallet::CreateCoinStake(const CKeyStore &keystore, unsigned int nBits,
     if(!txdb.ReadTxIndex(pcoin.first->GetHash(), txindex))
       continue;
 
-    // Read block header
-    CBlock block;
-    if(!block.ReadFromDisk(txindex.pos.nFile, txindex.pos.nBlockPos, false))
+    // Read block index
+    if(!mapBlockIndex.count(pcoin.first->hashBlock)) //sanity check
       continue;
+    CBlockIndex *pindex = mapBlockIndex[pcoin.first->hashBlock];
 
     static int nMaxStakeSearchInterval = 60;
-    if(block.GetBlockTime() + nStakeMinAge > txNew.nTime - nMaxStakeSearchInterval)
+    if(pindex->GetBlockTime() + nStakeMinAge > txNew.nTime - nMaxStakeSearchInterval)
       continue; // only count coins meeting min age requirement
 
     bool fKernelFound = false;
@@ -1306,7 +1306,7 @@ bool CWallet::CreateCoinStake(const CKeyStore &keystore, unsigned int nBits,
       // Search nSearchInterval seconds back up to nMaxStakeSearchInterval
       uint256 hashProofOfStake = 0;
       COutPoint prevoutStake = COutPoint(pcoin.first->GetHash(), pcoin.second);
-      if(CheckStakeKernelHash(nBits, block, txindex.pos.nTxPos - txindex.pos.nBlockPos,
+      if(CheckStakeKernelHash(nBits, pindex, txindex.pos.nTxPos - txindex.pos.nBlockPos,
                               *pcoin.first, prevoutStake, txNew.nTime - n, hashProofOfStake))
       {
         bool fPrintCoinStake = (fDebug && GetBoolArg("-printcoinstake"));
@@ -1358,7 +1358,7 @@ bool CWallet::CreateCoinStake(const CKeyStore &keystore, unsigned int nBits,
         vwtxPrev.push_back(pcoin.first);
         txNew.vout.push_back(CTxOut(0, scriptPubKeyOut));
 
-        if(block.GetBlockTime() + nStakeSplitAge > txNew.nTime)
+        if(pindex->GetBlockTime() + nStakeSplitAge > txNew.nTime)
           txNew.vout.push_back(CTxOut(0, scriptPubKeyOut)); //split stake
 
         if(fPrintCoinStake)

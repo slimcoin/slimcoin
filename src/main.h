@@ -1374,12 +1374,10 @@ public:
     return true;
   }
 
-
-
-  void print() const
+  void print(const uint256 &blockHash) const
   {
     printf("CBlock(hash=%s, ver=%d, hashPrevBlock=%s, hashMerkleRoot=%s, nTime=%u, nBits=%08x, nNonce=%u, vtx=%d, vchBlockSig=%s)\n",
-           GetHash().ToString().substr(0,20).c_str(),
+           blockHash.ToString().substr(0,20).c_str(),
            nVersion,
            hashPrevBlock.ToString().substr(0,20).c_str(),
            hashMerkleRoot.ToString().substr(0,10).c_str(),
@@ -1402,7 +1400,12 @@ public:
     printf("  vMerkleTree: ");
     for (unsigned int i = 0; i < vMerkleTree.size(); i++)
       printf("%s ", vMerkleTree[i].ToString().substr(0,10).c_str());
-    printf("\n");
+    printf("\n");    
+  }
+
+  void print() const
+  {
+    print(GetHash());
   }
 
 
