@@ -454,7 +454,7 @@ bool AppInit2(int argc, char *argv[])
       {
         CBlockIndex* pindex = (*mi).second;
         CBlock block;
-        block.ReadFromDisk(pindex);
+        block.ReadFromDisk(pindex, true, false);
         block.BuildMerkleTree();
         block.print();
         printf("\n");

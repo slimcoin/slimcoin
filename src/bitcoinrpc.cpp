@@ -3052,7 +3052,7 @@ Value getblock(const Array& params, bool fHelp)
 
   CBlock block;
   CBlockIndex* pblockindex = mapBlockIndex[hash];
-  block.ReadFromDisk(pblockindex, true);
+  block.ReadFromDisk(pblockindex, true, false);
 
   return blockToJSON(block, pblockindex, params.size() > 1 ? params[1].get_bool() : false);
 }

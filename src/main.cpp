@@ -923,16 +923,16 @@ int CTxIndex::GetDepthInMainChain() const
 // CBlock and CBlockIndex
 //
 
-bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions)
+bool CBlock::ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions, bool fCheckValidity)
 {
   if(!fReadTransactions)
   {
     *this = pindex->GetBlockHeader();
     return true;
   }
-  if(!ReadFromDisk(pindex->nFile, pindex->nBlockPos, fReadTransactions))
+  if(!ReadFromDisk(pindex->nFile, pindex->nBlockPos, fReadTransactions, fCheckValidity))
     return false;
-  if(GetHash() != pindex->GetBlockHash())
+  if(fCheckValidity && GetHash() != pindex->GetBlockHash())
     return error("CBlock::ReadFromDisk() : GetHash() doesn't match index");
   return true;
 }
@@ -3049,7 +3049,7 @@ void PrintBlockTree()
 
     // print item
     CBlock block;
-    block.ReadFromDisk(pindex);
+    block.ReadFromDisk(pindex, true, false);
     printf("%d (%u,%u) %s  %08lx  %s  mint %7s  tx %d",
            pindex->nHeight,
            pindex->nFile,
@@ -3476,12 +3476,15 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
 
     // find last block in inv vector
     unsigned int nLastBlock = (unsigned int)(-1);
-    for(unsigned int nInv = 0; nInv < vInv.size(); nInv++) {
-      if(vInv[vInv.size() - 1 - nInv].type == MSG_BLOCK) {
+    for(unsigned int nInv = 0; nInv < vInv.size(); nInv++)
+    {
+      if(vInv[vInv.size() - 1 - nInv].type == MSG_BLOCK) 
+      {
         nLastBlock = vInv.size() - 1 - nInv;
         break;
       }
     }
+
     CTxDB txdb("r");
     for(unsigned int nInv = 0; nInv < vInv.size(); nInv++)
     {
@@ -3542,7 +3545,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
           printf("\tnHeight: %d\t", mi->second->nHeight);
 
           CBlock block;
-          block.ReadFromDisk((*mi).second);
+          block.ReadFromDisk((*mi).second, true, false);
           pfrom->PushMessage("block", block);
 
           // Trigger them to send a getblocks request for the next batch of inventory

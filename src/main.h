@@ -1348,7 +1348,7 @@ public:
     return true;
   }
 
-  bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos, bool fReadTransactions=true)
+  bool ReadFromDisk(unsigned int nFile, unsigned int nBlockPos, bool fReadTransactions=true, bool fCheckValidity=true)
   {
     SetNull();
 
@@ -1368,7 +1368,7 @@ public:
     }
 
     // Check the header
-    if(fReadTransactions && IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
+    if(fReadTransactions && fCheckValidity && IsProofOfWork() && !CheckProofOfWork(GetHash(), nBits))
       return error("CBlock::ReadFromDisk() : errors in block header");
 
     return true;
@@ -1411,7 +1411,7 @@ public:
 
   bool DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex);
   bool ConnectBlock(CTxDB& txdb, CBlockIndex* pindex);
-  bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true);
+  bool ReadFromDisk(const CBlockIndex* pindex, bool fReadTransactions=true, bool fCheckValidity=true);
   bool SetBestChain(CTxDB& txdb, CBlockIndex* pindexNew);
   bool AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos);
   bool CheckBlock() const;
