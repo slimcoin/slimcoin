@@ -171,6 +171,11 @@ bool ScanBurnHashes(const CWalletTx &burnWTx, uint256 &smallestHashRet);
 //Applies ScanBurnHashes to all of the burnt hashes stored in the setBurnHashes
 void HashAllBurntTx(uint256 &smallestHashRet, CWalletTx &smallestWTxRet);
 
+inline double calculate_burn_multiplier(int64 burnValue, s32int nPoWBlocksBetween)
+{
+    return (BURN_CONSTANT / burnValue) * pow(2, (nPoWBlocksBetween - BURN_MIN_CONFIRMS) / BURN_HASH_DOUBLE);
+}
+
 //Given a number of burnt coins and their depth in the chain, returns the number of effectivly burnt coins
 inline int64 BurnCalcEffectiveCoins(int64 nCoins, s32int depthInChain)
 {
@@ -495,7 +500,7 @@ public:
     scriptPubKey.clear();
   }
 
-  bool IsNull()
+  bool IsNull() const
   {
     return (nValue == -1);
   }
@@ -750,6 +755,27 @@ public:
       return CTxOut(); //error
 
     return vout[burnTxOutIndex];
+  }
+
+  //return the number of effective burnt coins of a burnTx
+  int64 EffectiveBurntCoinsLeft(s32int BurnBlkHeight, s32int LastBlkHeight = -1) const
+  {
+      if(LastBlkHeight < 0)
+          LastBlkHeight = nBestHeight;
+
+      const CTxOut burnOutTx = GetBurnOutTx();
+
+      //This is not a burnTx if burnOutTx is null
+      if(burnOutTx.IsNull())
+          return 0;
+
+      const s32int between = nPoWBlocksBetween(BurnBlkHeight, LastBlkHeight);
+
+      //This burn Tx is still immature
+      if(between < BURN_MIN_CONFIRMS)
+          return 0;
+
+      return BurnCalcEffectiveCoins(burnOutTx.nValue, between);
   }
 
   /** Amount of bitcoins coming in to this transaction

@@ -2073,10 +2073,13 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
       {
         entry.push_back(Pair("confirmations", 1 + nBestHeight - pindex->nHeight));
 
-        //print the nPoWBlocksBetween if this is a burnTx, it will be useful for
-        // calculating the burn multiplier
+        //print the effective burn coins left if this is a burnTx
         if(isBurnTx)
-            entry.push_back(Pair("nPoWBlocksBetween", nPoWBlocksBetween(pindex->nHeight, nBestHeight)));
+        {
+            entry.push_back(Pair("burnt coins", (int64_t)tx.GetBurnOutTx().nValue));
+            entry.push_back(Pair("effective burnt coins left", 
+                                 (int64_t)tx.EffectiveBurntCoinsLeft(pindex->nHeight)));
+        }
 
         entry.push_back(Pair("time", (int64_t)pindex->nTime));
         entry.push_back(Pair("blocktime", (int64_t)pindex->nTime));

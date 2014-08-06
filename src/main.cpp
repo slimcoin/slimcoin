@@ -4387,9 +4387,8 @@ bool HashBurnData(uint256 burnBlockHash, uint256 hashPrevBlock, uint256 burnTxHa
 
   //calculate the multiplier for the hash, the pow() represents the decay
   // subtracts BURN_MIN_CONFIRMS since the first block the coins get active should have 100% power
-  const double multiplier = (BURN_CONSTANT / burnValue) * 
-    pow(2, (between - BURN_MIN_CONFIRMS) / BURN_HASH_DOUBLE);
-
+  const double multiplier = calculate_burn_multiplier(burnValue, between);
+  
   //Calculate the burn hash
   {
     //the largest value a uint256 can store
