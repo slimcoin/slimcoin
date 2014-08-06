@@ -2025,6 +2025,8 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
   entry.push_back(Pair("version", tx.nVersion));
   entry.push_back(Pair("time", (int64_t)tx.nTime));
   entry.push_back(Pair("locktime", (int64_t)tx.nLockTime));
+  entry.push_back(Pair("IsBurnTx", tx.IsBurnTx()));
+
   Array vin;
   BOOST_FOREACH(const CTxIn& txin, tx.vin)
   {
@@ -2043,6 +2045,7 @@ void TxToJSON(const CTransaction& tx, const uint256 hashBlock, Object& entry)
     in.push_back(Pair("sequence", (int64_t)txin.nSequence));
     vin.push_back(in);
   }
+
   entry.push_back(Pair("vin", vin));
   Array vout;
   for (unsigned int i = 0; i < tx.vout.size(); i++)
