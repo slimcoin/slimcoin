@@ -49,6 +49,8 @@ static const int64 MAX_MONEY = 250000000 * COIN;
 static const int64 MAX_MINT_PROOF_OF_WORK = 50 * COIN;
 static const int64 MAX_MINT_PROOF_OF_BURN = 250 * COIN;
 static const int64 MIN_TXOUT_AMOUNT = MIN_TX_FEE;
+// Default for -maxorphanblocks, maximum number of orphan blocks kept in memory
+static const unsigned int DEFAULT_MAX_ORPHAN_BLOCKS = 750;
 inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 static const int COINBASE_MATURITY_SLM = 500;
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.

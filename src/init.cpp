@@ -611,8 +611,9 @@ std::string HelpMessage()
       "  -dnsseed         \t  "   + _("Find peers using DNS lookup (default: 1)") + "\n" +
       "  -banscore=<n>    \t  "   + _("Threshold for disconnecting misbehaving peers (default: 100)") + "\n" +
       "  -bantime=<n>     \t  "   + _("Number of seconds to keep misbehaving peers from reconnecting (default: 86400)") + "\n" +
-      "  -maxreceivebuffer=<n>\t  " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 10000)") + "\n" +
-      "  -maxsendbuffer=<n>\t  "   + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 10000)") + "\n" +
+      "  -maxreceivebuffer=<n>\t " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 10000)") + "\n" +
+      "  -maxsendbuffer=<n>\t    "   + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 10000)") + "\n" +
+      "  -maxorphanblocks=<n>\t  "  + _("Maximum number of orphan blocks to store in the memory (default: 750)") + "\n" +
 #ifdef USE_UPNP
 #if USE_UPNP
       "  -upnp            \t  "   + _("Use Universal Plug and Play to map the listening port (default: 1)") + "\n" +
