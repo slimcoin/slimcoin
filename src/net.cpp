@@ -17,6 +17,7 @@
 #include <string.h>
 #endif
 
+#undef USE_UPNP
 #ifdef USE_UPNP
 #include <miniupnpc/miniwget.h>
 #include <miniupnpc/miniupnpc.h>
@@ -720,8 +721,10 @@ void ThreadSocketHandler2(void* parg)
           unsigned int nPos = vRecv.size();
 
           if(nPos > ReceiveBufferSize()) {
-            if(!pnode->fDisconnect)
+            if(!pnode->fDisconnect) {
               printf("socket recv flood control disconnect (%d bytes)\n", vRecv.size());
+              pnode->Misbehaving(50);
+            }
             pnode->CloseSocketDisconnect();
           }
           else {
@@ -786,8 +789,10 @@ void ThreadSocketHandler2(void* parg)
               }
             }
             if(vSend.size() > SendBufferSize()) {
-              if(!pnode->fDisconnect)
+              if(!pnode->fDisconnect) {
                 printf("socket send flood control disconnect (%d bytes)\n", vSend.size());
+              	pnode->Misbehaving(100);
+	      }
               pnode->CloseSocketDisconnect();
             }
           }
@@ -997,7 +1002,9 @@ void MapPort(bool /* unused fMapPort */)
 // The second name should resolve to a list of seed addresses.
 // testnet dns seed begins with 't', all else are slimcoin dns seeds.
 static const char *strDNSSeed[][2] = {
-  {"seed", "dnsseed.slimcoinpool.com"}
+  {"seed", "dnsseed.slimcoinpool.com"},
+  {"seed", "dnsseed.furiousnomad.com"},
+  {"seed", "dnsseed.shitcoinrapist.club"},
 };
 
 void ThreadDNSAddressSeed(void* parg)
@@ -1065,7 +1072,7 @@ void ThreadDNSAddressSeed2(void* parg)
 
 unsigned int pnSeed[] =
 {
-  0x231621b2, 0x4a54c854, 0x13cca445,
+  0x231621b2, 0x4a54c854, 0x13cca445, 0x4b64bb25, 0x09510905, 0x471503c0, 0xd8fab56b, 0xd9fab56b,
 };
 
 void DumpAddresses()
